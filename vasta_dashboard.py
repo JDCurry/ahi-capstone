@@ -3064,7 +3064,7 @@ def page_model_diagnostics():
 
     st.markdown("**Completed (this project)**")
     st.markdown("""
-    - Trained Hazard-LM v1.0 on 369,876 county-day observations (2010-2025) across 39 Washington counties
+    - Trained Hazard-LM v1.0 on 370,000+ county-day observations (2000-2025) across 39 Washington counties
     - Achieved strong discrimination: Fire AUC 0.89, Winter AUC 0.94, Wind AUC 0.87, Flood AUC 0.83, Seismic AUC 0.77
     - Implemented diffusion-based attention mechanism in temporal encoder for improved calibration
     - Applied per-hazard temperature scaling to improve probability calibration (ECE reduced 55-59% for fire/seismic)
@@ -3220,37 +3220,65 @@ def page_about():
     to multi-hazard risk assessment for emergency management in Washington State.
     
     **Author:** Joshua D. Curry  
-    **Institution:** Pierce College  
+    **Institution:** Pierce College Fort Steilacoom  
+    **Program:** Bachelor of Applied Science in Emergency Management (BAS-EM)  
     **Expected Graduation:** June 2026
+    
+    ---
+    
+    ### Capstone Course
+    
+    **EM 470 Emergency Management Capstone** (5 credits)
+    
+    The Capstone is a culminating academic and intellectual experience demonstrating learning 
+    acquisition and practical application from all courses, theories, techniques, and content 
+    taught in the Bachelor of Applied Science in Emergency Management Program.
     
     ---
     
     ### Research Papers
     
-    This work is supported by two peer-reviewed publications on SSRN:
+    This work is supported by two preprints on SSRN:
     """)
     
-    col1, col2 = st.columns(2)
+    st.markdown("""
+    #### Diffusion Attention: Replacing Softmax with Heat Kernel Dynamics
     
-    with col1:
-        st.markdown("""
-        **Paper 1: Hazard-LM Architecture**
-        
-        Technical details on the transformer-based model architecture, 
-        training methodology, and calibration approach.
-        
-        [View on SSRN](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5953096)
-        """)
+    *Posted: December 23, 2025*
     
-    with col2:
-        st.markdown("""
-        **Paper 2: Multi-Hazard Framework**
-        
-        Application of the model to Washington State's five primary 
-        natural hazards: fire, flood, wind, winter storms, and seismic events.
-        
-        [View on SSRN](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5959898)
-        """)
+    We propose replacing the softmax operation in transformer attention with a heat kernel diffusion process. 
+    We prove that standard softmax attention is equivalent to the equilibrium distribution of drift-diffusion 
+    dynamics on similarity scores, revealing softmax as a special case of a broader family of attention mechanisms. 
+    Finite-time diffusion attention provides provable outlier robustness, locality preservation, and improved 
+    calibration while maintaining expressiveness. Experiments on language modeling demonstrate that diffusion 
+    attention reduces Expected Calibration Error by 6-12% at 4 layers, with improvements increasing to 24-46% 
+    at 12 layers when following our depth scaling law t proportional to 1/sqrt(L). We further show that adaptive diffusion 
+    time trained end-to-end converges to t approximately 1.5, revealing a fundamental tradeoff where the optimal diffusion 
+    time for perplexity differs from the optimal for calibration.
+    
+    [View on SSRN](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5953096)
+    """)
+    
+    st.markdown("""
+    #### Heat Kernel Attention: Provable Sparsity via Diffusion Dynamics
+    
+    *Posted: December 26, 2025*
+    
+    We reformulate attention as heat diffusion on a discrete sequence graph, introducing a positional decay 
+    term that enforces locality with mathematical guarantees on attention propagation. While standard attention 
+    requires O(n^2) computation with an effective attention radius of ~100 tokens, heat kernel attention achieves 
+    O(n*r) complexity with r approximately 3 tokens - a ~30x reduction per layer - while preserving and even improving 
+    expressivity in language modeling benchmarks. We establish a composition law: effective context scales as 
+    L x r (layers x radius), with correlation r = -0.898 between effective context and perplexity. This enables 
+    deep local attention to match or exceed the performance of shallow global attention. Our 16-layer local 
+    attention model (r approximately 3) outperforms 12-layer global attention by 18% in perplexity (420.8 vs 497) while 
+    reducing per-layer attention complexity by 97%. The scaling exhibits diminishing returns beyond 48 tokens 
+    of effective context, consistent with the task's intrinsic context horizon rather than a model limitation. 
+    These results demonstrate that unconstrained global attention is not essential for language modeling, and 
+    that sparsity can be derived from physical diffusion principles rather than imposed heuristically.
+    
+    [View on SSRN](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5959898)
+    """)
     
     st.markdown("---")
     
@@ -3258,7 +3286,7 @@ def page_about():
     ### Model Overview
     
     **Hazard-LM v1.0** is a 136-million parameter transformer model trained on:
-    - 79,000+ historical hazard events (2000-2024)
+    - 79,000+ historical hazard events (2000-2025)
     - NOAA Storm Events Database
     - GridMET climate data (temperature, precipitation, humidity, wind)
     - USGS seismic records
