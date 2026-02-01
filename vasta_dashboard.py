@@ -87,15 +87,19 @@ try:
 except ImportError:
     HAZARD_LM_AVAILABLE = False
 
-# Shared inference helpers
+# Shared inference helpers - use cloud-safe inference_core (no training dependencies)
 try:
-    from utils.hazard_inference import predict_county_risks, load_local_llm, generate_risk_summary, load_wa_dataset
-except Exception:
-    # Will fallback to internal handlers if import fails
+    from inference_core import predict_county_risks_simple
+    predict_county_risks = predict_county_risks_simple  # Alias for compatibility
+except Exception as _inf_err:
+    print(f"[IMPORT] inference_core import failed: {_inf_err}")
     predict_county_risks = None
-    load_local_llm = None
-    generate_risk_summary = None
-    load_wa_dataset = None
+    predict_county_risks_simple = None
+
+# LLM helpers not available on cloud deployment
+load_local_llm = None
+generate_risk_summary = None
+load_wa_dataset = None
 
 # =============================================================================
 # CONFIGURATION
@@ -882,10 +886,19 @@ def predict_and_summarize(county_identifier: str, target_date: datetime.date):
     except Exception as e:
         return None, f'Model load failed: {e}'
 
+    # Load hazard dataset for inference
+    try:
+        hazard_df = pd.read_parquet(DATA_DIR / 'hazard_lm_dataset.parquet')
+    except Exception as e:
+        hazard_df = None
+
     # Run prediction (shared helper if imported)
     try:
-        if predict_county_risks is not None:
-            risks = predict_county_risks(model, county_identifier, target_date)
+        if predict_county_risks is not None and hazard_df is not None:
+            risks = predict_county_risks(model, county_identifier, hazard_df, target_date)
+        elif predict_county_risks is not None:
+            # Try without hazard_df (will use fallback internally)
+            risks = predict_county_risks(model, county_identifier, pd.DataFrame(), target_date)
         else:
             # No prediction helper available - return error
             return None, 'Prediction helper not available. Model loaded but inference pipeline not configured.'
