@@ -1044,6 +1044,47 @@ def render_sidebar():
         try:
             adv = st.checkbox('Show advanced debug/logs', value=False, help='Enable detailed logs and developer diagnostics')
             st.session_state.show_advanced = bool(adv)
+            
+            # Show model diagnostics when debug is enabled
+            if adv:
+                st.markdown("**Model Diagnostics:**")
+                
+                # Check all possible model paths
+                paths_to_check = [
+                    ("Local", Path("best_model.pt")),
+                    ("Cloud mount", Path("/mount/src/ahi-capstone/best_model.pt")),
+                    ("Tmp", Path("/tmp/best_model.pt")),
+                ]
+                
+                for name, p in paths_to_check:
+                    if p.exists():
+                        size_mb = p.stat().st_size / (1024*1024)
+                        st.success(f"{name}: {p} ({size_mb:.1f}MB)")
+                    else:
+                        st.error(f"{name}: {p} NOT FOUND")
+                
+                # Show resolved path and model status
+                st.write(f"RESOLVED_MODEL_PATH: {RESOLVED_MODEL_PATH}")
+                st.write(f"MODEL_LOAD_ERROR: {MODEL_LOAD_ERROR}")
+                
+                # Try to load model and show checksum
+                try:
+                    model, ok = load_hazard_model()
+                    st.write(f"Model loaded: {ok}")
+                    st.write(f"Model type: {type(model)}")
+                    if model is not None:
+                        param_count = sum(p.numel() for p in model.parameters())
+                        param_sum = sum(p.abs().sum().item() for p in model.parameters())
+                        st.write(f"Param count: {param_count:,}")
+                        st.write(f"Param checksum: {param_sum:.4f}")
+                        st.write(f"Model training mode: {model.training}")
+                except Exception as e:
+                    st.error(f"Model load error: {e}")
+                
+                # Clear cache button
+                if st.button("Clear Model Cache"):
+                    st.cache_resource.clear()
+                    st.rerun()
         except Exception:
             # if session_state unavailable, ignore
             pass
