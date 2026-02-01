@@ -113,7 +113,8 @@ st.set_page_config(
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 # Model paths - try local first, then /tmp/ for cloud
-MODEL_PATH_LOCAL = Path("best_model.pt")
+MODEL_PATH = Path("best_model.pt")  # Primary path (also used as alias)
+MODEL_PATH_LOCAL = MODEL_PATH
 MODEL_PATH_TMP = Path("/tmp/best_model.pt")
 MODEL_URL = "https://media.githubusercontent.com/media/JDCurry/ahi-capstone/main/best_model.pt"
 MODEL_LOAD_ERROR = None
@@ -963,12 +964,13 @@ def render_header():
 
 def render_sidebar():
     with st.sidebar:
-        # Left-top logo (local file `logo-dark.png` expected next to this script)
+        # Centered logo
         logo_path = Path(__file__).parent / 'logo-dark.png'
         try:
             if logo_path.exists():
-                # Use explicit width and avoid deprecated `use_column_width` parameter
-                st.image(str(logo_path), width=140)
+                col1, col2, col3 = st.columns([1, 2, 1])
+                with col2:
+                    st.image(str(logo_path), width=140)
         except Exception:
             pass
         st.markdown(f"""
