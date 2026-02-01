@@ -116,6 +116,8 @@ st.set_page_config(
 )
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+DATA_DIR = Path("data")  # Data directory for datasets and supporting files
+
 # Model paths - try multiple locations
 MODEL_PATH = Path("best_model.pt")  # Primary path (also used as alias)
 MODEL_PATH_LOCAL = MODEL_PATH
