@@ -3249,11 +3249,11 @@ def page_model_evaluation():
     
     # Performance metrics table
     performance_data = [
-        {"Hazard": "🔥 Fire", "AUC": 0.89, "Quality": "Excellent", "Notes": "Strong weather signal from ERC, temperature, humidity"},
-        {"Hazard": "❄️ Winter", "AUC": 0.94, "Quality": "Excellent", "Notes": "Clear seasonal patterns, temperature-driven"},
-        {"Hazard": "💨 Wind", "AUC": 0.87, "Quality": "Good", "Notes": "Captures storm patterns from temporal features"},
-        {"Hazard": "🌊 Flood", "AUC": 0.83, "Quality": "Good", "Notes": "Precipitation and streamflow patterns"},
-        {"Hazard": "🌋 Seismic", "AUC": 0.77, "Quality": "Good", "Notes": "Historical patterns; earthquakes less predictable"},
+        {"Hazard": "🔥 Fire", "AUC": 0.96, "Quality": "Excellent", "Notes": "Strong weather signal from ERC, temperature, humidity"},
+        {"Hazard": "❄️ Winter", "AUC": 0.96, "Quality": "Excellent", "Notes": "Clear seasonal patterns, temperature-driven"},
+        {"Hazard": "💨 Wind", "AUC": 0.90, "Quality": "Excellent", "Notes": "Captures storm patterns from temporal features"},
+        {"Hazard": "🌊 Flood", "AUC": 0.90, "Quality": "Excellent", "Notes": "Precipitation and streamflow patterns"},
+        {"Hazard": "🌋 Seismic", "AUC": 0.85, "Quality": "Good", "Notes": "Historical patterns; earthquakes less predictable"},
     ]
     
     st.dataframe(pd.DataFrame(performance_data), use_container_width=True, hide_index=True)
@@ -3261,7 +3261,7 @@ def page_model_evaluation():
     # Visual AUC bar chart
     fig = go.Figure()
     hazards = ["Fire", "Winter", "Wind", "Flood", "Seismic"]
-    aucs = [0.89, 0.94, 0.87, 0.83, 0.77]
+    aucs = [0.96, 0.96, 0.90, 0.90, 0.85]
     colors = [COLORS.get('fire', '#ff6b6b'), COLORS.get('winter', '#74c0fc'), 
               COLORS.get('wind', '#63e6be'), COLORS.get('flood', '#4dabf7'), 
               COLORS.get('seismic', '#da77f2')]
