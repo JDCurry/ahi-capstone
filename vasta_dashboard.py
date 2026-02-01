@@ -3338,10 +3338,12 @@ def page_about():
     st.markdown("## About This Project")
     
     st.markdown("""
-    ### Adaptive Hazard Intelligence System
+    ### Adaptive Hazard Intelligence (AHI)
     
-    This dashboard is a capstone project demonstrating the application of machine learning 
-    to multi-hazard risk assessment for emergency management in Washington State.
+    This capstone project demonstrates the application of machine learning to multi-hazard 
+    risk assessment for emergency management in Washington State. The core innovation is 
+    **Hazard-LM**, a transformer-based model that synthesizes climate, seismic, and historical 
+    event data to generate calibrated risk probabilities across five hazard categories.
     
     **Author:** Joshua D. Curry  
     **Institution:** Pierce College Fort Steilacoom  
@@ -3350,13 +3352,22 @@ def page_about():
     
     ---
     
-    ### Capstone Course
+    ### Capstone Context
     
-    **EM 470 Emergency Management Capstone** (5 credits)
+    **EM 470 Emergency Management Capstone**
     
-    The Capstone is a culminating academic and intellectual experience demonstrating learning 
-    acquisition and practical application from all courses, theories, techniques, and content 
-    taught in the Bachelor of Applied Science in Emergency Management Program.
+    This project serves as the culminating academic experience for the BAS-EM program, 
+    demonstrating practical application of emergency management principles through an 
+    interdisciplinary approach combining:
+    
+    - **Emergency Management Theory:** Risk assessment frameworks and resource prioritization
+    - **Data Science:** Feature engineering from multi-source hazard datasets
+    - **Machine Learning:** Custom transformer architecture for sequence modeling
+    - **Applied Research:** Novel attention mechanisms documented in peer-reviewed preprints
+    
+    The project addresses a real-world problem — helping emergency managers make data-driven 
+    decisions about resource allocation during multi-hazard scenarios — while integrating 
+    program knowledge into a scalable, deployable solution.
     
     ---
     
