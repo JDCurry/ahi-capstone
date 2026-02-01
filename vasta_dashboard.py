@@ -412,26 +412,6 @@ def inject_custom_css():
     .hazard-wind {{ background: {COLORS['wind']}; color: white; }}
     .hazard-winter {{ background: {COLORS['winter']}; color: white; }}
     .hazard-seismic {{ background: {COLORS['seismic']}; color: white; }}
-    
-    /* Global sans-serif font override */
-    * {{
-        font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif !important;
-    }}
-    
-    /* Plotly chart fonts */
-    .js-plotly-plot .plotly text,
-    .js-plotly-plot .plotly .gtitle,
-    .js-plotly-plot .plotly .xtitle,
-    .js-plotly-plot .plotly .ytitle,
-    .js-plotly-plot .plotly .legend text,
-    .js-plotly-plot .plotly .annotation-text {{
-        font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif !important;
-    }}
-    
-    /* Data tables */
-    .dataframe, .dataframe th, .dataframe td {{
-        font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif !important;
-    }}
     </style>
     """, unsafe_allow_html=True)
 
@@ -878,30 +858,13 @@ def compute_empirical_horizon_probs(df, horizon_days: int = 14, alpha: int = 20)
 
 
 def get_plotly_theme():
-    """Return dark Plotly theme with consistent sans-serif fonts"""
-    font_family = "'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif"
+    """Return dark Plotly theme"""
     return {
         'paper_bgcolor': COLORS['card_bg'],
         'plot_bgcolor': COLORS['card_bg'],
-        'font': {
-            'color': COLORS['text_secondary'], 
-            'family': font_family,
-            'size': 12
-        },
-        'title': {'font': {'family': font_family, 'size': 16}},
-        'xaxis': {
-            'gridcolor': COLORS['border'], 
-            'linecolor': COLORS['border'],
-            'title': {'font': {'family': font_family}},
-            'tickfont': {'family': font_family}
-        },
-        'yaxis': {
-            'gridcolor': COLORS['border'], 
-            'linecolor': COLORS['border'],
-            'title': {'font': {'family': font_family}},
-            'tickfont': {'family': font_family}
-        },
-        'legend': {'font': {'family': font_family}},
+        'font': {'color': COLORS['text_secondary'], 'family': 'Segoe UI'},
+        'xaxis': {'gridcolor': COLORS['border'], 'linecolor': COLORS['border']},
+        'yaxis': {'gridcolor': COLORS['border'], 'linecolor': COLORS['border']},
     }
 
 
