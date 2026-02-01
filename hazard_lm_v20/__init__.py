@@ -22,15 +22,27 @@ from .model import (
     CompoundEventHead,
 )
 
-from .trainer import (
-    HazardLMTrainer,
-    TrainingConfig,
-    TrainingPhaseConfig,
-    AdaptiveCheckpointer,
-    MetricsCalculator,
-    PhaseTrainer,
-    SampleHazardDataset,
-)
+# Trainer is optional - not needed for inference/deployment
+try:
+    from .trainer import (
+        HazardLMTrainer,
+        TrainingConfig,
+        TrainingPhaseConfig,
+        AdaptiveCheckpointer,
+        MetricsCalculator,
+        PhaseTrainer,
+        SampleHazardDataset,
+    )
+    _TRAINER_AVAILABLE = True
+except ImportError:
+    _TRAINER_AVAILABLE = False
+    HazardLMTrainer = None
+    TrainingConfig = None
+    TrainingPhaseConfig = None
+    AdaptiveCheckpointer = None
+    MetricsCalculator = None
+    PhaseTrainer = None
+    SampleHazardDataset = None
 
 from .data import (
     HazardSample,
