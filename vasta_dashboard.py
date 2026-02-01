@@ -2563,42 +2563,43 @@ def page_ai_predictions():
                 except Exception:
                     summary_obj = None
 
-        # Render compact card
-        st.markdown('### Risk Summaries')
-        if summary_obj is None:
-            st.info('No summary available. Run Quick Predict to generate a summary.')
-        else:
-            pub = summary_obj.get('public_summary') if isinstance(summary_obj, dict) else str(summary_obj)
-            eoc = summary_obj.get('eoc_brief', '') if isinstance(summary_obj, dict) else ''
-            drivers = summary_obj.get('drivers', []) if isinstance(summary_obj, dict) else []
-            conf = summary_obj.get('confidence_band', 'Not available') if isinstance(summary_obj, dict) else 'Not available'
+        # Risk Summaries section commented out for now
+        # # Render compact card
+        # st.markdown('### Risk Summaries')
+        # if summary_obj is None:
+        #     st.info('No summary available. Run Quick Predict to generate a summary.')
+        # else:
+        #     pub = summary_obj.get('public_summary') if isinstance(summary_obj, dict) else str(summary_obj)
+        #     eoc = summary_obj.get('eoc_brief', '') if isinstance(summary_obj, dict) else ''
+        #     drivers = summary_obj.get('drivers', []) if isinstance(summary_obj, dict) else []
+        #     conf = summary_obj.get('confidence_band', 'Not available') if isinstance(summary_obj, dict) else 'Not available'
 
-            # Compact card layout
-            st.markdown(f"<div style='background:{COLORS['card_bg']}; padding:12px; border-radius:6px;'><div style='font-weight:700; color:{COLORS['text_primary']};'>{pub}</div><div style='color:{COLORS['text_tertiary']}; margin-top:6px;'>Drivers: {', '.join(drivers[:2]) if drivers else 'None reported'} — Confidence: {conf}</div></div>", unsafe_allow_html=True)
+        #     # Compact card layout
+        #     st.markdown(f"<div style='background:{COLORS['card_bg']}; padding:12px; border-radius:6px;'><div style='font-weight:700; color:{COLORS['text_primary']};'>{pub}</div><div style='color:{COLORS['text_tertiary']}; margin-top:6px;'>Drivers: {', '.join(drivers[:2]) if drivers else 'None reported'} — Confidence: {conf}</div></div>", unsafe_allow_html=True)
 
-            # EOC brief collapsed
-            with st.expander('EOC Brief', expanded=False):
-                if eoc:
-                    st.markdown(eoc)
-                else:
-                    st.markdown('No EOC brief available in the summary.')
+        #     # EOC brief collapsed
+        #     with st.expander('EOC Brief', expanded=False):
+        #         if eoc:
+        #             st.markdown(eoc)
+        #         else:
+        #             st.markdown('No EOC brief available in the summary.')
 
-            # provenance and actions (only show to advanced users)
-            try:
-                show_adv = bool(st.session_state.get('show_advanced', False))
-            except Exception:
-                show_adv = False
-            if show_adv:
-                prov_line = provenance or 'generated'
-                # show only filename (not full path) for privacy unless advanced
-                try:
-                    prov_display = Path(prov_line).name if isinstance(prov_line, str) and '/' in prov_line else prov_line
-                except Exception:
-                    prov_display = prov_line
-                st.markdown(f"<div style='color:{COLORS['text_tertiary']}; font-size:11px; margin-top:8px;'>Provenance: {prov_display}</div>", unsafe_allow_html=True)
+        #     # provenance and actions (only show to advanced users)
+        #     try:
+        #         show_adv = bool(st.session_state.get('show_advanced', False))
+        #     except Exception:
+        #         show_adv = False
+        #     if show_adv:
+        #         prov_line = provenance or 'generated'
+        #         # show only filename (not full path) for privacy unless advanced
+        #         try:
+        #             prov_display = Path(prov_line).name if isinstance(prov_line, str) and '/' in prov_line else prov_line
+        #         except Exception:
+        #             prov_display = prov_line
+        #         st.markdown(f"<div style='color:{COLORS['text_tertiary']}; font-size:11px; margin-top:8px;'>Provenance: {prov_display}</div>", unsafe_allow_html=True)
 
-            # LLM summarization disabled for cloud deployment
-            # (Regenerate button removed - requires local Mistral/llama-cpp-python)
+        #     # LLM summarization disabled for cloud deployment
+        #     # (Regenerate button removed - requires local Mistral/llama-cpp-python)
         
 
         # If a precomputed calibrated JSON exists for this county, load and show it
