@@ -114,10 +114,37 @@ st.set_page_config(
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 # Use promoted finetune checkpoint path (prefer multi-epoch trained artifact)
 MODEL_PATH = Path("outputs/hazard_lm/pretrain_finetune/finetune/best_model.pt")
+# GitHub Releases URL for model download (update after creating release)
+MODEL_URL = "https://github.com/JDCurry/ahi-capstone/releases/download/v1.0/best_model.pt"
 # Resolved model path (may be updated at runtime to point to newest available)
 RESOLVED_MODEL_PATH = MODEL_PATH
 MODEL_LOAD_ERROR = None
 MODEL_DISPLAY_NAME = "Hazard-LM v1.0"
+
+
+def download_model_if_needed():
+    """Download model from GitHub Releases if not present locally."""
+    import requests
+    if MODEL_PATH.exists():
+        return True
+    
+    try:
+        MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
+        with st.spinner("Downloading Hazard-LM model (~184MB)... This only happens once."):
+            response = requests.get(MODEL_URL, stream=True, timeout=300)
+            response.raise_for_status()
+            total_size = int(response.headers.get('content-length', 0))
+            
+            with open(MODEL_PATH, 'wb') as f:
+                downloaded = 0
+                for chunk in response.iter_content(chunk_size=8192):
+                    f.write(chunk)
+                    downloaded += len(chunk)
+            
+            return MODEL_PATH.exists()
+    except Exception as e:
+        st.error(f"Failed to download model: {e}")
+        return False
 # Prefer canonical WA parquet by default (falls back inside loader if missing)
 DATA_PATH = Path("data/wa_gridmet/wa_hazard_dataset.parquet/wa_hazard_dataset.parquet")
 DUCKDB_PATH = Path("data/hazard_lm_warehouse.duckdb")
@@ -368,6 +395,10 @@ def load_hazard_model():
     """Load Hazard-LM v2.0 model from checkpoint."""
     global RESOLVED_MODEL_PATH, MODEL_LOAD_ERROR
     RESOLVED_MODEL_PATH = MODEL_PATH
+
+    # Download model from GitHub Releases if not present
+    if not RESOLVED_MODEL_PATH.exists():
+        download_model_if_needed()
 
     try:
         from hazard_lm_v20 import model as h20_model
