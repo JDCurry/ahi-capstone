@@ -365,126 +365,53 @@ def inject_custom_css():
 
 @st.cache_resource
 def load_hazard_model():
-    """Load Hazard-LM v1.0 model using the v1 helper factory.
-
-    This mirrors the approach in `vasta_risk_dashboard.py` and ensures the
-    model and its `config` are reconstructed consistently from the promoted
-    checkpoint artifact.
-    """
-    # Try hazard_lm_v20 first (preferred multi-hazard loader), then fall back to v1
+    """Load Hazard-LM v2.0 model from checkpoint."""
     global RESOLVED_MODEL_PATH, MODEL_LOAD_ERROR
     RESOLVED_MODEL_PATH = MODEL_PATH
 
     try:
-        # Prefer v2 loader if available
         from hazard_lm_v20 import model as h20_model
-        from hazard_lm_v20.inference import ModelLoader as H20ModelLoader
-
-        if RESOLVED_MODEL_PATH.exists():
-            # Attempt robust load from a single .pt checkpoint or state-dict
-            try:
-                state = torch.load(str(RESOLVED_MODEL_PATH), map_location='cpu')
-            except Exception:
-                state = None
-
-            # Create a model instance with default config matching common training
-            model = h20_model.create_hazard_lm()
-
-            try:
-                # State may be a nested dict (training artifact) or raw state_dict
-                sd = None
-                if isinstance(state, dict):
-                    if 'model_state_dict' in state:
-                        sd = state['model_state_dict']
-                    elif 'state_dict' in state:
-                        sd = state['state_dict']
-                    else:
-                        sd = state
-
-                if sd is not None:
-                    try:
-                        model.load_state_dict(sd)
-                    except Exception:
-                        # Try loading per-component pieces when present
-                        if isinstance(sd, dict):
-                            if 'backbone' in sd:
-                                model.backbone.load_state_dict(sd['backbone'])
-                            if 'backbone_ln' in sd:
-                                model.backbone_ln.load_state_dict(sd['backbone_ln'])
-                            if 'token_embedding' in sd:
-                                model.token_embedding.load_state_dict(sd['token_embedding'])
-                            if 'position_embedding' in sd:
-                                model.position_embedding.load_state_dict(sd['position_embedding'])
-                            if 'hazard_heads' in sd or 'hazard_heads' in sd.get('heads', {}):
-                                try:
-                                    model.heads.load_state_dict(sd.get('hazard_heads', sd.get('heads', {})))
-                                except Exception:
-                                    pass
-                            # adapters and interaction may be present as nested dicts
-                            if 'adapters' in sd:
-                                for h, st in sd['adapters'].items():
-                                    try:
-                                        model.adapters[h].load_state(st)
-                                    except Exception:
-                                        pass
-
-                model.eval()
-                MODEL_LOAD_ERROR = None
-                return model, True
-            except Exception:
-                # Fall through to try ModelLoader or v1 loader
-                pass
-
-        # If a checkpoint directory pattern exists, try ModelLoader.load_from_checkpoints
-        ckpt_dir = None
-        if RESOLVED_MODEL_PATH.exists() and RESOLVED_MODEL_PATH.is_dir():
-            ckpt_dir = str(RESOLVED_MODEL_PATH)
-        else:
-            # maybe parent dir contains structured checkpoints
-            parent = RESOLVED_MODEL_PATH.parent
-            if parent.exists() and any(parent.iterdir()):
-                ckpt_dir = str(parent)
-
-        if ckpt_dir:
-            try:
-                # ModelLoader expects a checkpoint directory and a model class/config; use factory
-                cfg = h20_model.HazardLMConfig()
-                model = H20ModelLoader.load_from_checkpoints(ckpt_dir, h20_model.HazardLM, cfg, device='cpu')
-                model.eval()
-                MODEL_LOAD_ERROR = None
-                return model, True
-            except Exception:
-                pass
-
-    except Exception:
-        # v2 not available or failed — we'll try v1 below
-        pass
-
-    # Fall back to legacy v1 loader
-    try:
-        from hazard_lm_v1 import HazardLMv1
 
         if not RESOLVED_MODEL_PATH.exists():
-            st.error(f"Hazard-LM model not available. Ensure {RESOLVED_MODEL_PATH} exists.")
+            MODEL_LOAD_ERROR = f"Model file not found: {RESOLVED_MODEL_PATH}"
             return None, False
 
-        model = HazardLMv1.from_pretrained(str(RESOLVED_MODEL_PATH), device='cpu')
+        # Load checkpoint
+        state = torch.load(str(RESOLVED_MODEL_PATH), map_location='cpu', weights_only=False)
+
+        # Create model with default config
+        model = h20_model.create_hazard_lm()
+
+        # Extract state dict from nested structure
+        sd = None
+        if isinstance(state, dict):
+            if 'model_state_dict' in state:
+                sd = state['model_state_dict']
+            elif 'state_dict' in state:
+                sd = state['state_dict']
+            else:
+                sd = state
+
+        if sd is not None:
+            # Try direct load first
+            try:
+                model.load_state_dict(sd, strict=False)
+            except Exception:
+                # Try loading per-component
+                if isinstance(sd, dict):
+                    for key in ['backbone', 'backbone_ln', 'token_embedding', 'position_embedding']:
+                        if key in sd:
+                            try:
+                                getattr(model, key).load_state_dict(sd[key])
+                            except Exception:
+                                pass
+
         model.eval()
         MODEL_LOAD_ERROR = None
         return model, True
+
     except Exception as e:
-        try:
-            os.makedirs('outputs/logs', exist_ok=True)
-            ts = datetime.now().strftime('%Y%m%d_%H%M%S')
-            log_path = Path(f'outputs/logs/model_load_error_{ts}.log')
-            with open(log_path, 'w') as fh:
-                fh.write('Model load error:\n')
-                fh.write('Resolved model path: ' + str(RESOLVED_MODEL_PATH) + '\n\n')
-                fh.write(traceback.format_exc())
-            MODEL_LOAD_ERROR = str(log_path)
-        except Exception:
-            MODEL_LOAD_ERROR = None
-        st.error(f"Failed to load model: {e}")
+        MODEL_LOAD_ERROR = str(e)
         return None, False
 
 
