@@ -114,8 +114,8 @@ st.set_page_config(
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 # Use promoted finetune checkpoint path (prefer multi-epoch trained artifact)
 MODEL_PATH = Path("outputs/hazard_lm/pretrain_finetune/finetune/best_model.pt")
-# GitHub Releases URL for model download (update after creating release)
-MODEL_URL = "https://github.com/JDCurry/ahi-capstone/releases/download/v1.0/best_model.pt"
+# Git LFS media URL for model download when local LFS clone fails
+MODEL_URL = "https://media.githubusercontent.com/media/JDCurry/ahi-capstone/main/outputs/hazard_lm/pretrain_finetune/finetune/best_model.pt"
 # Resolved model path (may be updated at runtime to point to newest available)
 RESOLVED_MODEL_PATH = MODEL_PATH
 MODEL_LOAD_ERROR = None
