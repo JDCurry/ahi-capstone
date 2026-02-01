@@ -112,10 +112,10 @@ st.set_page_config(
 )
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-# Use promoted finetune checkpoint path (prefer multi-epoch trained artifact)
-MODEL_PATH = Path("outputs/hazard_lm/pretrain_finetune/finetune/best_model.pt")
+# Model checkpoint at root for simpler deployment
+MODEL_PATH = Path("best_model.pt")
 # Git LFS media URL for model download when local LFS clone fails
-MODEL_URL = "https://media.githubusercontent.com/media/JDCurry/ahi-capstone/main/outputs/hazard_lm/pretrain_finetune/finetune/best_model.pt"
+MODEL_URL = "https://media.githubusercontent.com/media/JDCurry/ahi-capstone/main/best_model.pt"
 # Resolved model path (may be updated at runtime to point to newest available)
 RESOLVED_MODEL_PATH = MODEL_PATH
 MODEL_LOAD_ERROR = None
@@ -883,8 +883,18 @@ def predict_and_summarize(county_identifier: str, target_date: datetime.date):
 # =============================================================================
 
 def render_header():
-    current_time = datetime.now().strftime("%H:%M:%S")
-    current_date = datetime.now().strftime("%B %d, %Y")
+    # Use PST timezone for consistent display
+    try:
+        from zoneinfo import ZoneInfo
+        pst = ZoneInfo('America/Los_Angeles')
+        now_pst = datetime.now(pst)
+    except Exception:
+        # Fallback to UTC-8 offset if zoneinfo unavailable
+        from datetime import timezone, timedelta
+        pst = timezone(timedelta(hours=-8))
+        now_pst = datetime.now(pst)
+    current_time = now_pst.strftime("%H:%M:%S")
+    current_date = now_pst.strftime("%B %d, %Y")
     
     model, model_ok = load_hazard_model()
     status_color = COLORS['success'] if model_ok else COLORS['warning']
@@ -952,41 +962,34 @@ def render_sidebar():
         
         st.markdown(f"<p style='color: {COLORS['text_tertiary']}; font-size: 11px; text-transform: uppercase; margin-top: 20px;'>Analytics Modules</p>", unsafe_allow_html=True)
         
-        if st.button("Executive Dashboard", use_container_width=True):
+        if st.button("Executive Dashboard", width='stretch'):
             st.session_state.page = 'dashboard'
         
-        if st.button("Interactive Map", use_container_width=True):
+        if st.button("Interactive Map", width='stretch'):
             st.session_state.page = 'map'
         
-        if st.button("Risk Assessment", use_container_width=True):
+        if st.button("Risk Assessment", width='stretch'):
             st.session_state.page = 'risk'
         
-        if st.button("Climate Analysis", use_container_width=True):
+        if st.button("Climate Analysis", width='stretch'):
             st.session_state.page = 'climate'
         
-        if st.button("Mitigation Planning", use_container_width=True):
+        if st.button("Mitigation Planning", width='stretch'):
             st.session_state.page = 'mitigation'
         
         st.markdown(f"<p style='color: {COLORS['text_tertiary']}; font-size: 11px; text-transform: uppercase; margin-top: 20px;'>AI Tools</p>", unsafe_allow_html=True)
         
-        if st.button("Risk Assessments", use_container_width=True):
+        if st.button("Risk Assessments", width='stretch'):
             st.session_state.page = 'ai_predict'
         
-        if st.button("Model Diagnostics", use_container_width=True):
+        if st.button("Model Diagnostics", width='stretch'):
             st.session_state.page = 'diagnostics'
         
-        if st.button("Model Evaluation", use_container_width=True):
+        if st.button("Model Evaluation", width='stretch'):
             st.session_state.page = 'model_eval'
         
         st.markdown("---")
         
-        st.markdown(f"<p style='color: {COLORS['text_tertiary']}; font-size: 11px; text-transform: uppercase;'>County Filter</p>", unsafe_allow_html=True)
-        
-        df = load_hazard_data()
-        if df is not None:
-            counties = ['All Counties'] + sorted(df['county'].unique().tolist())
-            selected = st.selectbox("Select County", counties, label_visibility="collapsed")
-            st.session_state.selected_county = None if selected == "All Counties" else selected
         # Advanced debug toggle (hidden by default)
         try:
             adv = st.checkbox('Show advanced debug/logs', value=False, help='Enable detailed logs and developer diagnostics')
@@ -1085,7 +1088,7 @@ def page_executive_dashboard():
             showlegend=False
         )
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
     
     with col2:
         st.markdown("### Hazard Distribution")
@@ -1114,7 +1117,7 @@ def page_executive_dashboard():
             showlegend=True
         )
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
     
     # Alerts
     st.markdown("### System Alerts")
@@ -1182,7 +1185,7 @@ def page_interactive_map():
     
     if not FOLIUM_AVAILABLE:
         st.warning("Folium not installed. Install with: pip install folium streamlit-folium geopandas")
-        st.dataframe(county_stats[['county', 'risk_score', 'population', 'total_events']], use_container_width=True)
+        st.dataframe(county_stats[['county', 'risk_score', 'population', 'total_events']], width='stretch')
         return
     
     # Controls
@@ -1550,7 +1553,7 @@ def page_interactive_map():
             ).add_to(m)
     
     # Display map
-    st_folium(m, width=None, height=600, use_container_width=True)
+    st_folium(m, height=600, width=700)
 
     # Render precomputed calibrated inference table (if available) in a left-aligned, smaller container
     try:
@@ -1587,7 +1590,7 @@ def page_interactive_map():
                 'Heat Stress': '{:.1f}',
                 'Drought Stress': '{:.1f}'
             }),
-            use_container_width=True,
+            width='stretch',
             hide_index=True
         )
     elif county_stats is not None:
@@ -1608,7 +1611,7 @@ def page_interactive_map():
                     f'{hazard_layer} Events': '{:,.0f}',
                     'Total Events': '{:,.0f}'
                 }),
-                use_container_width=True,
+                width='stretch',
                 hide_index=True
             )
         else:
@@ -1621,7 +1624,7 @@ def page_interactive_map():
                     'Population': '{:,.0f}',
                     'Risk Score': '{:.2%}'
                 }),
-                use_container_width=True,
+                width='stretch',
                 hide_index=True
             )
 
@@ -1671,7 +1674,7 @@ def page_risk_assessment():
             'Max Events': int(county_stats[col].max())
         })
     
-    st.dataframe(pd.DataFrame(hazard_data), use_container_width=True, hide_index=True)
+    st.dataframe(pd.DataFrame(hazard_data), width='stretch', hide_index=True)
     
     # Box plot
     fig = go.Figure()
@@ -1692,7 +1695,7 @@ def page_risk_assessment():
         height=400
     )
     
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
     
     # County detail table
     st.markdown("### Detailed County Analysis")
@@ -1731,7 +1734,7 @@ def page_risk_assessment():
                 'Seismic Rate': '{:.2f}', 'Seismic Rate (Low)': '{:.2f}', 'Seismic Rate (High)': '{:.2f}',
                 'Total Rate': '{:.2f}', 'Total Rate (Low)': '{:.2f}', 'Total Rate (High)': '{:.2f}'
             }),
-            use_container_width=True,
+            width='stretch',
             hide_index=True
         )
     else:
@@ -1747,7 +1750,7 @@ def page_risk_assessment():
                 'SVI': '{:.2f}',
                 'Risk Score': '{:.2%}'
             }),
-            use_container_width=True,
+            width='stretch',
             hide_index=True
         )
 
@@ -1831,7 +1834,7 @@ def page_climate_analysis():
             height=400
         )
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
         
         # High risk counties by trend
         st.markdown("### High Risk Counties by Climate Trend")
@@ -1848,7 +1851,7 @@ def page_climate_analysis():
                 'Heat Stress': '{:.1f}',
                 'Drought Stress': '{:.1f}'
             }),
-            use_container_width=True,
+            width='stretch',
             hide_index=True
         )
     
@@ -1920,7 +1923,7 @@ def page_climate_analysis():
                 height=350
             )
             
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
         
         with col2:
             st.markdown("### Fire Weather (ERC - Fire Danger)")
@@ -1940,7 +1943,7 @@ def page_climate_analysis():
                 height=350
             )
             
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
         
         # Monthly patterns
         st.markdown("### Seasonal Patterns")
@@ -1986,7 +1989,7 @@ def page_climate_analysis():
             height=400
         )
         
-        st.plotly_chart(fig, use_container_width=True)
+        st.plotly_chart(fig, width='stretch')
 
 
 # =============================================================================
@@ -2056,7 +2059,7 @@ def page_mitigation_planning():
     actions_df = pd.DataFrame(actions)
     actions_df = actions_df.sort_values('ROI', ascending=False)
     
-    st.dataframe(actions_df, use_container_width=True, hide_index=True)
+    st.dataframe(actions_df, width='stretch', hide_index=True)
     
     # Cost-benefit calculator
     st.markdown("### Investment Calculator")
@@ -2117,7 +2120,7 @@ def page_mitigation_planning():
         height=400
     )
     
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
 
 
 def page_seasonal_planning():
@@ -2203,7 +2206,7 @@ def page_ai_predictions():
     
     # Seasonal planner link: provide quick access to seasonal/historical planning
     try:
-        if st.sidebar.button('Seasonal Planner', use_container_width=True):
+        if st.sidebar.button('Seasonal Planner', width='stretch'):
             st.session_state.page = 'seasonal'
     except Exception:
         pass
@@ -2246,7 +2249,7 @@ def page_ai_predictions():
         if county_img_path:
             col_img, col_info = st.columns([1, 2])
             with col_img:
-                st.image(str(county_img_path), caption=f"{selected_county} County", use_container_width=True)
+                st.image(str(county_img_path), caption=f"{selected_county} County", width='stretch')
             with col_info:
                 st.markdown(f"""
                 **Location**: {selected_county} County, Washington  
@@ -2748,7 +2751,7 @@ def page_ai_predictions():
                 fig = px.bar(results_df, x='hazard', y='probability', color='hazard', labels={'probability':'Probability'}, color_discrete_sequence=colors)
                 fig.update_layout(**get_plotly_theme(), title=f'Predicted Hazard Probabilities - {selected_county}', height=360, showlegend=False)
                 fig.update_yaxes(tickformat='.2%')
-                st.plotly_chart(fig, use_container_width=True)
+                st.plotly_chart(fig, width='stretch')
             except Exception:
                 pass
 
@@ -2921,7 +2924,7 @@ def page_ai_predictions():
                     col = f'{h}_p'
                     if col in display_df.columns:
                         display_df[h.title()] = (display_df[col] * 100).round(1).astype(str) + '%'
-                st.dataframe(display_df[['county'] + [h.title() for h in hazards]], use_container_width=True)
+                st.dataframe(display_df[['county'] + [h.title() for h in hazards]], width='stretch')
                 
                 # Download button
                 csv = statewide_df.to_csv(index=False)
@@ -3135,7 +3138,7 @@ def page_model_evaluation():
         {"Hazard": "🌋 Seismic", "AUC": 0.77, "Quality": "Good", "Notes": "Historical patterns; earthquakes less predictable"},
     ]
     
-    st.dataframe(pd.DataFrame(performance_data), use_container_width=True, hide_index=True)
+    st.dataframe(pd.DataFrame(performance_data), width='stretch', hide_index=True)
     
     # Visual AUC bar chart
     fig = go.Figure()
@@ -3150,7 +3153,7 @@ def page_model_evaluation():
     fig.add_hline(y=0.5, line_dash="dash", line_color="red", annotation_text="Random (0.5)")
     fig.update_layout(**get_plotly_theme(), title="AUC by Hazard Type", 
                       yaxis_title="AUC Score", yaxis_range=[0, 1], height=350)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width='stretch')
     
     avg_auc = sum(aucs) / len(aucs)
     st.success(f"**Overall Performance:** Average AUC of {avg_auc:.2f} across all hazard types")
@@ -3172,14 +3175,14 @@ def page_model_evaluation():
         {"Hazard": "Winter", "Temperature": 1.0, "ECE Before": "5.4%", "ECE After": "5.4%", "Improvement": "No scaling needed"},
         {"Hazard": "Seismic", "Temperature": 0.835, "ECE Before": "2.0%", "ECE After": "0.9%", "Improvement": "55% better"},
     ]
-    st.dataframe(pd.DataFrame(calibration_data), use_container_width=True, hide_index=True)
+    st.dataframe(pd.DataFrame(calibration_data), width='stretch', hide_index=True)
     st.caption("ECE = Expected Calibration Error. Lower is better. <5% is considered well-calibrated.")
 
     # Show reliability diagram if available
     reliability_img = Path("figures/figure_reliability_multi_panel.png")
     if reliability_img.exists():
         st.markdown("**Reliability Diagrams**")
-        st.image(str(reliability_img), use_container_width=True)
+        st.image(str(reliability_img), width='stretch')
         st.caption("Blue = before temperature scaling, Orange = after. Diagonal line = perfect calibration.")
 
     # User guide section
