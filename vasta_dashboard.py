@@ -3189,7 +3189,7 @@ def page_model_diagnostics():
     st.markdown("**Completed (this project)**")
     st.markdown("""
     - Trained Hazard-LM v1.0 on 370,000+ county-day observations (2000-2025) across 39 Washington counties
-    - Achieved strong discrimination: Fire AUC 0.96, Winter AUC 0.96, Wind AUC 0.89, Flood AUC 0.89, Seismic AUC 0.85
+    - Achieved strong discrimination: Fire AUC 0.96, Winter AUC 0.96, Wind AUC 0.90, Flood AUC 0.90, Seismic AUC 0.85
     - Implemented diffusion-based attention mechanism in temporal encoder for improved calibration
     - Applied per-hazard temperature scaling to improve probability calibration (ECE reduced 55-59% for fire/seismic)
     - Built interactive dashboard with Quick Predict, statewide predictions, and county-level risk assessment
