@@ -2452,7 +2452,7 @@ def page_ai_predictions():
                         **What the percentages mean:**
                         - These are **relative risk probabilities** for the {MAX_FORECAST_DAYS}-day forecast window
                         - They represent the model's confidence that hazard conditions will be present, not the certainty of an event
-                        - Values are calibrated against historical county-level data (2010-2024)
+                        - Values are calibrated against historical county-level data (2000-2025)
                         
                         **Risk level thresholds:**
                         | Probability | Level | Recommended Response |
