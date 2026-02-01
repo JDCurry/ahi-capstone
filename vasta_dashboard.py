@@ -887,9 +887,8 @@ def predict_and_summarize(county_identifier: str, target_date: datetime.date):
         if predict_county_risks is not None:
             risks = predict_county_risks(model, county_identifier, target_date)
         else:
-            # Best-effort fallback: try to call a local function if present
-            from vasta_risk_dashboard import predict_county_risks as _pcr
-            risks = _pcr(model, county_identifier, target_date)
+            # No prediction helper available - return error
+            return None, 'Prediction helper not available. Model loaded but inference pipeline not configured.'
     except Exception as e:
         return None, f'Prediction failed: {e}'
 
@@ -2426,7 +2425,7 @@ def page_ai_predictions():
         # Render compact card
         st.markdown('### Risk Summaries')
         if summary_obj is None:
-            st.info('No summary available. Run Quick Predict to generate a summary (local Mistral preferred).')
+            st.info('No summary available. Run Quick Predict to generate a summary.')
         else:
             pub = summary_obj.get('public_summary') if isinstance(summary_obj, dict) else str(summary_obj)
             eoc = summary_obj.get('eoc_brief', '') if isinstance(summary_obj, dict) else ''
@@ -2457,43 +2456,8 @@ def page_ai_predictions():
                     prov_display = prov_line
                 st.markdown(f"<div style='color:{COLORS['text_tertiary']}; font-size:11px; margin-top:8px;'>Provenance: {prov_display}</div>", unsafe_allow_html=True)
 
-            # Regenerate button - uses session state from Quick Predict
-            if summarize_with_gguf is not None:
-                if st.button('Regenerate (local Mistral)'):
-                    st.info('Generating summary with local Mistral (may take a minute).')
-                    # Use session state from Quick Predict if available
-                    lq = st.session_state.get('last_quick_prediction', {})
-                    if lq.get('county') == selected_county and lq.get('risks'):
-                        try:
-                            # Build risk packet from session state
-                            packet = {
-                                'county': selected_county,
-                                'date': lq.get('date', str(datetime.now().date())),
-                                'hazards': [{'name': k, 'prob': float(v)} for k, v in lq['risks'].items()]
-                            }
-                            parsed = summarize_with_gguf(packet)
-                            # Update session state with new mistral summary
-                            st.session_state['last_quick_prediction']['mistral_summary'] = parsed
-                            # Also save to disk for persistence
-                            outdir = Path('outputs/hazard_lm/summaries_gguf')
-                            outdir.mkdir(parents=True, exist_ok=True)
-                            outpath = outdir / f'parsed_summary_gguf_{selected_county}_{lq.get("date", "latest")}.json'
-                            json.dump(parsed, open(outpath,'w'), indent=2)
-                            st.success(f'Summary regenerated! Refresh to see updated results.')
-                            try:
-                                st.rerun()
-                            except Exception:
-                                pass
-                        except Exception as e:
-                            err = str(e)
-                            if 'llama_cpp' in err or 'llama-cpp' in err or 'No module named' in err:
-                                st.error('Regeneration failed: local LLM runtime not available. Install `llama-cpp-python`.')
-                            else:
-                                st.error(f'Regeneration failed: {e}')
-                    else:
-                        st.warning('No prediction results available. Click "Quick Predict (Live Model)" first.')
-            else:
-                st.info('Local Mistral (GGUF) not available. Install `llama-cpp-python` to enable.')
+            # LLM summarization disabled for cloud deployment
+            # (Regenerate button removed - requires local Mistral/llama-cpp-python)
         
 
         # If a precomputed calibrated JSON exists for this county, load and show it
@@ -2858,7 +2822,7 @@ def page_ai_predictions():
     # Statewide Predictions (Model-based)
     # -----------------------------
     st.markdown('---')
-    st.subheader('🗺️ Statewide Model Predictions')
+    st.subheader('Statewide Model Predictions')
     st.caption('Run the Hazard-LM model for all 39 Washington counties. This may take 2-3 minutes.')
     
     # Get list of counties
@@ -2872,7 +2836,7 @@ def page_ai_predictions():
     else:
         target_date = datetime.now().date() + timedelta(days=7)  # 7-day forecast
         
-        if st.button('🚀 Run Statewide Predictions', type='primary'):
+        if st.button('Run Statewide Predictions', type='primary'):
             progress_bar = st.progress(0)
             status_text = st.empty()
             results_container = st.empty()
