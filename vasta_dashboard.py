@@ -3145,7 +3145,7 @@ def page_model_diagnostics():
     emergencies - it looks at patterns from the past to estimate future risk.
     
     **How it works in simple terms:**
-    1. **It learns from history** - The model studied over 156,000 days of data across all 39 Washington counties
+    1. **It learns from history** - The model studied over 370,000 county-day observations (2000-2025) across all 39 Washington counties
     2. **It watches the weather** - Temperature, humidity, wind, and fire weather conditions over 14-day windows
     3. **It knows the land** - Forest, urban, agricultural areas all have different risk profiles (via NLCD land cover data)
     4. **It understands context** - Demographics, infrastructure, and social vulnerability factors
@@ -3192,7 +3192,6 @@ def page_model_diagnostics():
     - Achieved strong discrimination: Fire AUC 0.89, Winter AUC 0.94, Wind AUC 0.87, Flood AUC 0.83, Seismic AUC 0.77
     - Implemented diffusion-based attention mechanism in temporal encoder for improved calibration
     - Applied per-hazard temperature scaling to improve probability calibration (ECE reduced 55-59% for fire/seismic)
-    - Integrated local LLM summarization (Mistral-7B) for plain-language risk explanations
     - Built interactive dashboard with Quick Predict, statewide predictions, and county-level risk assessment
     - Validated on 37,039 held-out test samples with comprehensive calibration analysis
     """)
