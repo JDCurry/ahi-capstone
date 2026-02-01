@@ -1026,33 +1026,33 @@ def render_sidebar():
         
         st.markdown(f"<p style='color: {COLORS['text_tertiary']}; font-size: 11px; text-transform: uppercase; margin-top: 20px;'>Analytics Modules</p>", unsafe_allow_html=True)
         
-        if st.button("Executive Dashboard", width='stretch'):
+        if st.button("Executive Dashboard", use_container_width=True):
             st.session_state.page = 'dashboard'
         
-        if st.button("Interactive Map", width='stretch'):
+        if st.button("Interactive Map", use_container_width=True):
             st.session_state.page = 'map'
         
-        if st.button("Risk Assessment", width='stretch'):
+        if st.button("Risk Assessment", use_container_width=True):
             st.session_state.page = 'risk'
         
-        if st.button("Climate Analysis", width='stretch'):
+        if st.button("Climate Analysis", use_container_width=True):
             st.session_state.page = 'climate'
         
-        if st.button("Mitigation Planning", width='stretch'):
+        if st.button("Mitigation Planning", use_container_width=True):
             st.session_state.page = 'mitigation'
         
         st.markdown(f"<p style='color: {COLORS['text_tertiary']}; font-size: 11px; text-transform: uppercase; margin-top: 20px;'>AI Tools</p>", unsafe_allow_html=True)
         
-        if st.button("Quick Predict", width='stretch'):
+        if st.button("Quick Predict", use_container_width=True):
             st.session_state.page = 'ai_predict'
         
-        if st.button("Model Diagnostics", width='stretch'):
+        if st.button("Model Diagnostics", use_container_width=True):
             st.session_state.page = 'diagnostics'
         
-        if st.button("Model Evaluation", width='stretch'):
+        if st.button("Model Evaluation", use_container_width=True):
             st.session_state.page = 'model_eval'
         
-        if st.button("About This Project", width='stretch'):
+        if st.button("About This Project", use_container_width=True):
             st.session_state.page = 'about'
         
         st.markdown("---")
@@ -1196,7 +1196,7 @@ def page_executive_dashboard():
             showlegend=False
         )
         
-        st.plotly_chart(fig, width='stretch')
+        st.plotly_chart(fig, use_container_width=True)
     
     with col2:
         st.markdown("### Hazard Distribution")
@@ -1225,7 +1225,7 @@ def page_executive_dashboard():
             showlegend=True
         )
         
-        st.plotly_chart(fig, width='stretch')
+        st.plotly_chart(fig, use_container_width=True)
     
     # Alerts
     st.markdown("### System Alerts")
@@ -1293,7 +1293,7 @@ def page_interactive_map():
     
     if not FOLIUM_AVAILABLE:
         st.warning("Folium not installed. Install with: pip install folium streamlit-folium geopandas")
-        st.dataframe(county_stats[['county', 'risk_score', 'population', 'total_events']], width='stretch')
+        st.dataframe(county_stats[['county', 'risk_score', 'population', 'total_events']], use_container_width=True)
         return
     
     # Controls
@@ -1600,7 +1600,7 @@ def page_interactive_map():
                 'Heat Stress': '{:.1f}',
                 'Drought Stress': '{:.1f}'
             }),
-            width='stretch',
+            use_container_width=True,
             hide_index=True
         )
     elif county_stats is not None:
@@ -1621,7 +1621,7 @@ def page_interactive_map():
                     f'{hazard_layer} Events': '{:,.0f}',
                     'Total Events': '{:,.0f}'
                 }),
-                width='stretch',
+                use_container_width=True,
                 hide_index=True
             )
         else:
@@ -1634,7 +1634,7 @@ def page_interactive_map():
                     'Population': '{:,.0f}',
                     'Risk Score': '{:.2%}'
                 }),
-                width='stretch',
+                use_container_width=True,
                 hide_index=True
             )
 
@@ -1684,7 +1684,7 @@ def page_risk_assessment():
             'Max Events': int(county_stats[col].max())
         })
     
-    st.dataframe(pd.DataFrame(hazard_data), width='stretch', hide_index=True)
+    st.dataframe(pd.DataFrame(hazard_data), use_container_width=True, hide_index=True)
     
     # Box plot
     fig = go.Figure()
@@ -1705,7 +1705,7 @@ def page_risk_assessment():
         height=400
     )
     
-    st.plotly_chart(fig, width='stretch')
+    st.plotly_chart(fig, use_container_width=True)
     
     # County detail table
     st.markdown("### Detailed County Analysis")
@@ -1744,7 +1744,7 @@ def page_risk_assessment():
                 'Seismic Rate': '{:.2f}', 'Seismic Rate (Low)': '{:.2f}', 'Seismic Rate (High)': '{:.2f}',
                 'Total Rate': '{:.2f}', 'Total Rate (Low)': '{:.2f}', 'Total Rate (High)': '{:.2f}'
             }),
-            width='stretch',
+            use_container_width=True,
             hide_index=True
         )
     else:
@@ -1760,7 +1760,7 @@ def page_risk_assessment():
                 'SVI': '{:.2f}',
                 'Risk Score': '{:.2%}'
             }),
-            width='stretch',
+            use_container_width=True,
             hide_index=True
         )
 
@@ -1844,7 +1844,7 @@ def page_climate_analysis():
             height=400
         )
         
-        st.plotly_chart(fig, width='stretch')
+        st.plotly_chart(fig, use_container_width=True)
         
         # High risk counties by trend
         st.markdown("### High Risk Counties by Climate Trend")
@@ -1861,7 +1861,7 @@ def page_climate_analysis():
                 'Heat Stress': '{:.1f}',
                 'Drought Stress': '{:.1f}'
             }),
-            width='stretch',
+            use_container_width=True,
             hide_index=True
         )
     
@@ -1933,7 +1933,7 @@ def page_climate_analysis():
                 height=350
             )
             
-            st.plotly_chart(fig, width='stretch')
+            st.plotly_chart(fig, use_container_width=True)
         
         with col2:
             st.markdown("### Fire Weather (ERC - Fire Danger)")
@@ -1953,7 +1953,7 @@ def page_climate_analysis():
                 height=350
             )
             
-            st.plotly_chart(fig, width='stretch')
+            st.plotly_chart(fig, use_container_width=True)
         
         # Monthly patterns
         st.markdown("### Seasonal Patterns")
@@ -1999,7 +1999,7 @@ def page_climate_analysis():
             height=400
         )
         
-        st.plotly_chart(fig, width='stretch')
+        st.plotly_chart(fig, use_container_width=True)
 
 
 # =============================================================================
@@ -2069,7 +2069,7 @@ def page_mitigation_planning():
     actions_df = pd.DataFrame(actions)
     actions_df = actions_df.sort_values('ROI', ascending=False)
     
-    st.dataframe(actions_df, width='stretch', hide_index=True)
+    st.dataframe(actions_df, use_container_width=True, hide_index=True)
     
     # Cost-benefit calculator
     st.markdown("### Investment Calculator")
@@ -2130,7 +2130,7 @@ def page_mitigation_planning():
         height=400
     )
     
-    st.plotly_chart(fig, width='stretch')
+    st.plotly_chart(fig, use_container_width=True)
 
 
 def page_seasonal_planning():
@@ -2216,7 +2216,7 @@ def page_ai_predictions():
     
     # Seasonal planner link: provide quick access to seasonal/historical planning
     try:
-        if st.sidebar.button('Seasonal Planner', width='stretch'):
+        if st.sidebar.button('Seasonal Planner', use_container_width=True):
             st.session_state.page = 'seasonal'
     except Exception:
         pass
@@ -2231,6 +2231,23 @@ def page_ai_predictions():
     MAX_FORECAST_DAYS = 14 if '14' in forecast_choice else 30
     today = datetime.now().date()
     max_forecast_date = today + timedelta(days=MAX_FORECAST_DAYS)
+    
+    # Explain forecast periods to users
+    current_month = today.strftime('%B')
+    with st.expander(f"About forecast periods (viewing on {today.strftime('%B %d, %Y')})", expanded=False):
+        st.markdown(f"""
+        **Why 14 and 30 days?**
+        - **14-day forecasts** offer higher confidence because weather prediction accuracy decreases over time. This is our recommended window for operational planning.
+        - **30-day forecasts** provide extended situational awareness but carry greater uncertainty. Use for strategic planning, not immediate action.
+        
+        **These forecasts start from today's date** ({today.strftime('%B %d, %Y')}). The model considers:
+        - Current seasonal weather patterns for {current_month}
+        - Recent climate trends from GridMET data
+        - Historical hazard frequencies for this time of year
+        
+        **Seasonal variation matters:** Fire risk typically peaks in late summer (July-September), while winter storm risk is highest November-February. 
+        Running this same forecast in a different month would show different risk profiles based on seasonal factors.
+        """)
 
     if len(county_df) > 0:
         latest = county_df.iloc[0]
@@ -2255,16 +2272,47 @@ def page_ai_predictions():
                     return p
             return None
         
+        def _get_image_base64(img_path):
+            """Convert image to base64 for inline HTML display."""
+            import base64
+            try:
+                with open(img_path, 'rb') as f:
+                    return base64.b64encode(f.read()).decode('utf-8')
+            except Exception:
+                return ''
+        
+        def _get_seasonal_note(month: int) -> str:
+            """Return seasonal hazard context based on month."""
+            if month in [12, 1, 2]:
+                return "Winter storm & flood risk elevated"
+            elif month in [3, 4, 5]:
+                return "Transitional — flood risk from snowmelt"
+            elif month in [6, 7, 8]:
+                return "Peak wildfire season"
+            elif month in [9, 10, 11]:
+                return "Fire season waning, winter storms emerging"
+            return "Typical conditions"
+        
         county_img_path = _get_county_image(selected_county)
         if county_img_path:
             col_img, col_info = st.columns([1, 2])
             with col_img:
-                st.image(str(county_img_path), caption=f"{selected_county} County", width='stretch')
+                # Fixed size container for consistent image display (300px width, maintains aspect ratio)
+                st.markdown(f"""
+                <div style="width: 300px; height: 200px; overflow: hidden; border-radius: 8px; background: {COLORS['card_bg']};">
+                    <img src="data:image/jpeg;base64,{_get_image_base64(county_img_path)}" 
+                         style="width: 100%; height: 100%; object-fit: cover;" 
+                         alt="{selected_county} County">
+                </div>
+                <p style="text-align: center; color: {COLORS['text_secondary']}; font-size: 12px; margin-top: 4px;">{selected_county} County</p>
+                """, unsafe_allow_html=True)
             with col_info:
                 st.markdown(f"""
                 **Location**: {selected_county} County, Washington  
-                **Forecast Horizon**: {forecast_choice}  
-                **Data Source**: Hazard-LM v1.0 multi-hazard model
+                **Forecast Horizon**: {forecast_choice} (from {today.strftime('%b %d')})  
+                **Forecast End Date**: {max_forecast_date.strftime('%B %d, %Y')}  
+                **Data Source**: Hazard-LM v1.0 multi-hazard model  
+                **Season**: {current_month} — {_get_seasonal_note(today.month)}
                 """)
 
         # Quick synchronous prediction (live model) -- useful for interactive exploration
@@ -2340,20 +2388,95 @@ def page_ai_predictions():
 
                     # end hazards row
                     st.markdown('### Model Summary (Risk)')
+                    
+                    # Enhanced summary with interpretation for emergency managers
+                    risks = last.get('risks', {})
+                    sorted_risks = sorted(risks.items(), key=lambda x: x[1], reverse=True)
+                    
+                    # Helper to interpret risk levels
+                    def _interpret_risk(prob):
+                        if prob < 0.15:
+                            return "Low", "Routine monitoring adequate"
+                        elif prob < 0.30:
+                            return "Moderate", "Enhanced awareness recommended"
+                        elif prob < 0.50:
+                            return "Elevated", "Active monitoring and preparation advised"
+                        elif prob < 0.70:
+                            return "High", "Consider pre-positioning resources"
+                        else:
+                            return "Severe", "Elevated readiness recommended"
+                    
+                    # Hazard-specific guidance
+                    hazard_guidance = {
+                        'fire': {
+                            'icon': '🔥',
+                            'action': 'Review evacuation routes, coordinate with fire districts, assess defensible space near critical facilities',
+                            'resources': 'DNR Fire Prevention, local fire districts'
+                        },
+                        'flood': {
+                            'icon': '🌊',
+                            'action': 'Check drainage systems, verify flood gauges, pre-stage pumps and sandbags',
+                            'resources': 'NWS River Forecasts, USGS stream gauges'
+                        },
+                        'wind': {
+                            'icon': '💨',
+                            'action': 'Coordinate with utilities on power line inspections, secure outdoor equipment',
+                            'resources': 'NWS High Wind Watches, utility outage maps'
+                        },
+                        'winter': {
+                            'icon': '❄️',
+                            'action': 'Verify road treatment supplies, check backup power at shelters, coordinate with WSDOT',
+                            'resources': 'NWS Winter Storm Watches, WSDOT road conditions'
+                        },
+                        'seismic': {
+                            'icon': '🌍',
+                            'action': 'Review building assessments, confirm communications redundancy, update ShakeAlert settings',
+                            'resources': 'PNSN earthquake monitoring, ShakeAlert'
+                        }
+                    }
+                    
+                    # Top hazards section
+                    st.markdown("**Top Hazards for This Period:**")
+                    for hazard, prob in sorted_risks[:2]:
+                        level, interpretation = _interpret_risk(prob)
+                        info = hazard_guidance.get(hazard, {'icon': '⚠️', 'action': 'Review standard protocols', 'resources': 'Local EOC'})
+                        st.markdown(f"""
+                        - {info['icon']} **{hazard.title()}** — {prob*100:.1f}% ({level})  
+                          *{interpretation}*  
+                          **Suggested action:** {info['action']}
+                        """)
+                    
+                    # Interpretation guide
+                    with st.expander("How to interpret these numbers", expanded=False):
+                        st.markdown(f"""
+                        **What the percentages mean:**
+                        - These are **relative risk probabilities** for the {MAX_FORECAST_DAYS}-day forecast window
+                        - They represent the model's confidence that hazard conditions will be present, not the certainty of an event
+                        - Values are calibrated against historical county-level data (2010-2024)
+                        
+                        **Risk level thresholds:**
+                        | Probability | Level | Recommended Response |
+                        |-------------|-------|---------------------|
+                        | < 15% | Low | Routine monitoring |
+                        | 15-30% | Moderate | Enhanced awareness |
+                        | 30-50% | Elevated | Active preparation |
+                        | 50-70% | High | Pre-position resources |
+                        | > 70% | Severe | Elevated readiness |
+                        
+                        **Important caveats:**
+                        - Model uses county-aggregated data; local conditions may vary significantly
+                        - Always cross-reference with NWS forecasts and local observations
+                        - Seismic risk is based on long-term patterns, not short-term prediction
+                        """)
+                    
+                    # Original LLM summary if available
                     try:
                         summary = last.get('summary')
-                        if isinstance(summary, str):
-                            lines = [s.strip() for s in summary.split('\n') if s.strip()]
-                            if len(lines) == 1:
-                                sentences = [s.strip() for s in lines[0].split('. ') if s.strip()]
-                                if len(sentences) > 1:
-                                    lines = sentences
-                            bullets = '\n'.join([f"- {l}" for l in lines]) if lines else summary
-                            st.markdown(bullets)
-                        else:
-                            st.write(summary)
+                        if isinstance(summary, str) and summary and 'Top hazards:' not in summary:
+                            with st.expander("Detailed Model Output", expanded=False):
+                                st.text(summary)
                     except Exception:
-                        st.text(last.get('summary'))
+                        pass
 
         # LLM Summaries (fallback and local GGUF) - constrained to risk packet
         try:
@@ -2726,7 +2849,7 @@ def page_ai_predictions():
                 fig = px.bar(results_df, x='hazard', y='probability', color='hazard', labels={'probability':'Probability'}, color_discrete_sequence=colors)
                 fig.update_layout(**get_plotly_theme(), title=f'Predicted Hazard Probabilities - {selected_county}', height=360, showlegend=False)
                 fig.update_yaxes(tickformat='.2%')
-                st.plotly_chart(fig, width='stretch')
+                st.plotly_chart(fig, use_container_width=True)
             except Exception:
                 pass
 
@@ -2899,7 +3022,7 @@ def page_ai_predictions():
                     col = f'{h}_p'
                     if col in display_df.columns:
                         display_df[h.title()] = (display_df[col] * 100).round(1).astype(str) + '%'
-                st.dataframe(display_df[['county'] + [h.title() for h in hazards]], width='stretch')
+                st.dataframe(display_df[['county'] + [h.title() for h in hazards]], use_container_width=True)
                 
                 # Download button
                 csv = statewide_df.to_csv(index=False)
@@ -3133,7 +3256,7 @@ def page_model_evaluation():
         {"Hazard": "🌋 Seismic", "AUC": 0.77, "Quality": "Good", "Notes": "Historical patterns; earthquakes less predictable"},
     ]
     
-    st.dataframe(pd.DataFrame(performance_data), width='stretch', hide_index=True)
+    st.dataframe(pd.DataFrame(performance_data), use_container_width=True, hide_index=True)
     
     # Visual AUC bar chart
     fig = go.Figure()
@@ -3148,7 +3271,7 @@ def page_model_evaluation():
     fig.add_hline(y=0.5, line_dash="dash", line_color="red", annotation_text="Random (0.5)")
     fig.update_layout(**get_plotly_theme(), title="AUC by Hazard Type", 
                       yaxis_title="AUC Score", yaxis_range=[0, 1], height=350)
-    st.plotly_chart(fig, width='stretch')
+    st.plotly_chart(fig, use_container_width=True)
     
     avg_auc = sum(aucs) / len(aucs)
     st.success(f"**Overall Performance:** Average AUC of {avg_auc:.2f} across all hazard types")
@@ -3170,14 +3293,14 @@ def page_model_evaluation():
         {"Hazard": "Winter", "Temperature": 1.0, "ECE Before": "5.4%", "ECE After": "5.4%", "Improvement": "No scaling needed"},
         {"Hazard": "Seismic", "Temperature": 0.835, "ECE Before": "2.0%", "ECE After": "0.9%", "Improvement": "55% better"},
     ]
-    st.dataframe(pd.DataFrame(calibration_data), width='stretch', hide_index=True)
+    st.dataframe(pd.DataFrame(calibration_data), use_container_width=True, hide_index=True)
     st.caption("ECE = Expected Calibration Error. Lower is better. <5% is considered well-calibrated.")
 
     # Show reliability diagram if available
     reliability_img = Path("figures/figure_reliability_multi_panel.png")
     if reliability_img.exists():
         st.markdown("**Reliability Diagrams**")
-        st.image(str(reliability_img), width='stretch')
+        st.image(str(reliability_img), use_container_width=True)
         st.caption("Blue = before temperature scaling, Orange = after. Diagonal line = perfect calibration.")
 
     # User guide section
