@@ -112,54 +112,65 @@ st.set_page_config(
 )
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-# Model checkpoint at root for simpler deployment
-MODEL_PATH = Path("best_model.pt")
-# Git LFS media URL for model download when local LFS clone fails
+# Model paths - try local first, then /tmp/ for cloud
+MODEL_PATH_LOCAL = Path("best_model.pt")
+MODEL_PATH_TMP = Path("/tmp/best_model.pt")
 MODEL_URL = "https://media.githubusercontent.com/media/JDCurry/ahi-capstone/main/best_model.pt"
-# Resolved model path (may be updated at runtime to point to newest available)
-RESOLVED_MODEL_PATH = MODEL_PATH
 MODEL_LOAD_ERROR = None
 MODEL_DISPLAY_NAME = "Hazard-LM v1.0"
+MIN_MODEL_SIZE = 10_000_000  # 10MB - real model is ~184MB
 
+def get_model_path():
+    """Get the best available model path."""
+    # Check local file first (works if LFS pulled correctly)
+    if MODEL_PATH_LOCAL.exists() and MODEL_PATH_LOCAL.stat().st_size > MIN_MODEL_SIZE:
+        return MODEL_PATH_LOCAL
+    # Check /tmp/ (for cloud downloads)
+    if MODEL_PATH_TMP.exists() and MODEL_PATH_TMP.stat().st_size > MIN_MODEL_SIZE:
+        return MODEL_PATH_TMP
+    return None
 
 def download_model_if_needed():
     """Download model from GitHub LFS media URL if not present or if only LFS pointer exists."""
     import requests
     
-    # Check if file exists and is the actual model (not just LFS pointer ~134 bytes)
-    min_model_size = 10_000_000  # 10MB - real model is ~184MB
-    if MODEL_PATH.exists() and MODEL_PATH.stat().st_size > min_model_size:
-        return True
+    # Already have a valid model?
+    existing = get_model_path()
+    if existing:
+        return existing
     
+    # Download to /tmp/ (always writable on Streamlit Cloud)
+    target = MODEL_PATH_TMP
     try:
-        MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
-        print(f"Downloading Hazard-LM model from {MODEL_URL}...")
-        
+        print(f"Downloading Hazard-LM model to {target}...")
         response = requests.get(MODEL_URL, stream=True, timeout=600)
         response.raise_for_status()
         total_size = int(response.headers.get('content-length', 0))
         
-        # Verify we're getting the full file, not the LFS pointer
-        if total_size < min_model_size:
+        if total_size < MIN_MODEL_SIZE:
             print(f"Warning: Download size {total_size} too small, expected ~184MB")
-            return False
+            return None
         
-        with open(MODEL_PATH, 'wb') as f:
+        with open(target, 'wb') as f:
             downloaded = 0
             for chunk in response.iter_content(chunk_size=65536):
                 f.write(chunk)
                 downloaded += len(chunk)
-                # Progress indicator
-                if total_size > 0 and downloaded % (10 * 1024 * 1024) < 65536:
+                if total_size > 0 and downloaded % (20 * 1024 * 1024) < 65536:
                     pct = int(100 * downloaded / total_size)
                     print(f"Downloaded {downloaded // (1024*1024)}MB / {total_size // (1024*1024)}MB ({pct}%)")
         
-        print(f"Model download complete: {MODEL_PATH.stat().st_size // (1024*1024)}MB")
-        return MODEL_PATH.exists() and MODEL_PATH.stat().st_size > min_model_size
+        print(f"Model download complete: {target.stat().st_size // (1024*1024)}MB")
+        if target.exists() and target.stat().st_size > MIN_MODEL_SIZE:
+            return target
+        return None
         
     except Exception as e:
         print(f"Failed to download model: {e}")
-        return False
+        return None
+
+# Resolved model path
+RESOLVED_MODEL_PATH = get_model_path() or MODEL_PATH_LOCAL
 # Prefer canonical WA parquet by default (falls back inside loader if missing)
 DATA_PATH = Path("data/wa_gridmet/wa_hazard_dataset.parquet/wa_hazard_dataset.parquet")
 DUCKDB_PATH = Path("data/hazard_lm_warehouse.duckdb")
@@ -409,27 +420,33 @@ def inject_custom_css():
 def load_hazard_model():
     """Load Hazard-LM v2.0 model from checkpoint."""
     global RESOLVED_MODEL_PATH, MODEL_LOAD_ERROR
-    RESOLVED_MODEL_PATH = MODEL_PATH
 
-    # Always try to download if file is missing or too small (LFS pointer)
-    min_model_size = 10_000_000  # 10MB
-    if not RESOLVED_MODEL_PATH.exists() or RESOLVED_MODEL_PATH.stat().st_size < min_model_size:
-        download_model_if_needed()
+    # Try to get existing model path or download
+    model_path = get_model_path()
+    if model_path is None:
+        model_path = download_model_if_needed()
     
-    # Verify model file is valid
-    if not RESOLVED_MODEL_PATH.exists():
-        MODEL_LOAD_ERROR = f"Model file not found: {RESOLVED_MODEL_PATH}"
+    if model_path is None:
+        MODEL_LOAD_ERROR = f"Model not available - download failed"
         return None, False
     
-    if RESOLVED_MODEL_PATH.stat().st_size < min_model_size:
-        MODEL_LOAD_ERROR = f"Model file too small ({RESOLVED_MODEL_PATH.stat().st_size} bytes) - download may have failed"
+    RESOLVED_MODEL_PATH = model_path
+    
+    # Verify model file is valid
+    if not model_path.exists():
+        MODEL_LOAD_ERROR = f"Model file not found: {model_path}"
+        return None, False
+    
+    file_size = model_path.stat().st_size
+    if file_size < MIN_MODEL_SIZE:
+        MODEL_LOAD_ERROR = f"Model file too small ({file_size} bytes) - download may have failed"
         return None, False
 
     try:
         from hazard_lm_v20 import model as h20_model
 
         # Load checkpoint
-        state = torch.load(str(RESOLVED_MODEL_PATH), map_location='cpu', weights_only=False)
+        state = torch.load(str(model_path), map_location='cpu', weights_only=False)
 
         # Create model with default config
         model = h20_model.create_hazard_lm()
@@ -1553,7 +1570,7 @@ def page_interactive_map():
             ).add_to(m)
     
     # Display map
-    st_folium(m, height=600, width=700)
+    st_folium(m, width=None, height=600, use_container_width=True)
 
     # Render precomputed calibrated inference table (if available) in a left-aligned, smaller container
     try:
