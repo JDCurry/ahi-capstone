@@ -2305,7 +2305,6 @@ def page_ai_predictions():
                          style="width: 100%; height: 100%; object-fit: cover;" 
                          alt="{selected_county} County">
                 </div>
-                <p style="text-align: center; color: {COLORS['text_secondary']}; font-size: 12px; margin-top: 4px;">{selected_county} County</p>
                 """, unsafe_allow_html=True)
             with col_info:
                 st.markdown(f"""
