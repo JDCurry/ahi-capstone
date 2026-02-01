@@ -1,0 +1,17 @@
+# Diffusion-Based-Attention Requirements
+# Python 3.8+ recommended
+
+# Core dependencies
+torch>=2.0.0
+numpy>=1.21.0
+tqdm>=4.60.0
+
+# Data loading and tokenization
+datasets>=2.0.0
+transformers>=4.20.0
+
+# Visualization (optional, for figure generation)
+matplotlib>=3.5.0
+
+# Note: CUDA support requires appropriate PyTorch installation
+# See https://pytorch.org/get-started/locally/ for platform-specific instructions
