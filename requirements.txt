@@ -13,6 +13,7 @@ geopandas>=0.14.0
 
 # PyTorch (CPU only for Streamlit Cloud)
 torch>=2.0.0
+torchvision>=0.15.0
 --extra-index-url https://download.pytorch.org/whl/cpu
 
 # Data
