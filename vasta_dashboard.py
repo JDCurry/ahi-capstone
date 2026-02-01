@@ -112,9 +112,10 @@ st.set_page_config(
 )
 
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-# Model paths - try local first, then /tmp/ for cloud
+# Model paths - try multiple locations
 MODEL_PATH = Path("best_model.pt")  # Primary path (also used as alias)
 MODEL_PATH_LOCAL = MODEL_PATH
+MODEL_PATH_CLOUD = Path("/mount/src/ahi-capstone/best_model.pt")  # Streamlit Cloud clones here
 MODEL_PATH_TMP = Path("/tmp/best_model.pt")
 MODEL_URL = "https://media.githubusercontent.com/media/JDCurry/ahi-capstone/main/best_model.pt"
 MODEL_LOAD_ERROR = None
@@ -123,12 +124,14 @@ MIN_MODEL_SIZE = 10_000_000  # 10MB - real model is ~184MB
 
 def get_model_path():
     """Get the best available model path."""
-    # Check local file first (works if LFS pulled correctly)
-    if MODEL_PATH_LOCAL.exists() and MODEL_PATH_LOCAL.stat().st_size > MIN_MODEL_SIZE:
-        return MODEL_PATH_LOCAL
-    # Check /tmp/ (for cloud downloads)
-    if MODEL_PATH_TMP.exists() and MODEL_PATH_TMP.stat().st_size > MIN_MODEL_SIZE:
-        return MODEL_PATH_TMP
+    # Check all possible locations
+    for path in [MODEL_PATH_LOCAL, MODEL_PATH_CLOUD, MODEL_PATH_TMP]:
+        try:
+            if path.exists() and path.stat().st_size > MIN_MODEL_SIZE:
+                print(f"Found valid model at: {path} ({path.stat().st_size // (1024*1024)}MB)")
+                return path
+        except Exception:
+            pass
     return None
 
 def download_model_if_needed():
@@ -1323,52 +1326,31 @@ def page_interactive_map():
                         trend_color = '#27ae60'
                     
                     popup_html = f"""
-                    <div style="font-family: 'Segoe UI', sans-serif; min-width: 320px; background: #1a1f26; border-radius: 8px; overflow: hidden;">
-                        <div style="background: linear-gradient(135deg, {color} 0%, #1a1f26 100%); padding: 12px 16px;">
-                            <h3 style="margin: 0; color: #fff; font-size: 18px; font-weight: 600;">{county_name} County</h3>
-                            <div style="color: rgba(255,255,255,0.8); font-size: 13px; margin-top: 4px;">
+                    <div style="font-family: 'Segoe UI', sans-serif; background: #1a1f26; border-radius: 6px; overflow: hidden;">
+                        <div style="background: linear-gradient(135deg, {color} 0%, #1a1f26 100%); padding: 8px 10px;">
+                            <h3 style="margin: 0; color: #fff; font-size: 14px; font-weight: 600;">{county_name} County</h3>
+                            <div style="color: rgba(255,255,255,0.85); font-size: 11px; margin-top: 2px;">
                                 Climate Fire Risk (NOAA events + climate indicators): {risk_score:.1f} | {risk_category} Risk
                             </div>
-                            <div style="color: #8b949e; font-size: 11px; margin-top: 6px;">Includes NOAA fire counts and climate trend indicators (heat / drought)</div>
+                            <div style="color: #8b949e; font-size: 10px; margin-top: 4px;">Includes NOAA fire counts and climate trend indicators (heat / drought)</div>
                         </div>
-                        <div style="padding: 12px 16px;">
-                            <table style="width: 100%; font-size: 12px; color: #8b949e; border-collapse: collapse;">
-                                <tr style="border-bottom: 1px solid #2d333b;">
-                                    <td style="padding: 6px 0;">Climate Trend</td>
-                                    <td style="text-align: right; color: {trend_color}; font-weight: 600;">{climate_trend}</td>
-                                </tr>
-                                <tr style="border-bottom: 1px solid #2d333b;">
-                                    <td style="padding: 6px 0;">Heat Stress</td>
-                                    <td style="text-align: right; color: #e6edf3;">{heat_stress:.1f}</td>
-                                </tr>
-                                <tr style="border-bottom: 1px solid #2d333b;">
-                                    <td style="padding: 6px 0;">Drought Stress</td>
-                                    <td style="text-align: right; color: #e6edf3;">{drought_stress:.1f}</td>
-                                </tr>
-                                <tr style="border-bottom: 1px solid #2d333b;">
-                                    <td style="padding: 6px 0;">Fire History Score</td>
-                                    <td style="text-align: right; color: #e6edf3;">{fire_history:.1f}</td>
-                                </tr>
-                                <tr>
-                                    <td style="padding: 6px 0;">WUI Exposure</td>
-                                    <td style="text-align: right; color: #e6edf3;">{wui_exposure:.1f}%</td>
-                                </tr>
+                        <div style="padding: 8px 10px;">
+                            <table style="width: 100%; font-size: 11px; color: #8b949e; border-collapse: collapse;">
+                                <tr style="border-bottom: 1px solid #2d333b;"><td style="padding: 4px 0;">Climate Trend</td><td style="text-align: right; color: {trend_color}; font-weight: 600;">{climate_trend}</td></tr>
+                                <tr style="border-bottom: 1px solid #2d333b;"><td style="padding: 4px 0;">Heat Stress</td><td style="text-align: right; color: #e6edf3;">{heat_stress:.1f}</td></tr>
+                                <tr style="border-bottom: 1px solid #2d333b;"><td style="padding: 4px 0;">Drought Stress</td><td style="text-align: right; color: #e6edf3;">{drought_stress:.1f}</td></tr>
+                                <tr style="border-bottom: 1px solid #2d333b;"><td style="padding: 4px 0;">Fire History Score</td><td style="text-align: right; color: #e6edf3;">{fire_history:.1f}</td></tr>
+                                <tr><td style="padding: 4px 0;">WUI Exposure</td><td style="text-align: right; color: #e6edf3;">{wui_exposure:.1f}%</td></tr>
                             </table>
-                            <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid #2d333b;">
-                                <table style="width: 100%; font-size: 12px; color: #8b949e; border-collapse: collapse;">
-                                    <tr style="border-bottom: 1px solid #2d333b;">
-                                        <td style="padding: 6px 0;">Population</td>
-                                        <td style="text-align: right; color: #e6edf3;">{population:,}</td>
-                                    </tr>
-                                    <tr>
-                                        <td style="padding: 6px 0;">At Risk (WUI)</td>
-                                        <td style="text-align: right; color: #e6edf3;">{pop_at_risk:,}</td>
-                                    </tr>
+                            <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid #2d333b;">
+                                <table style="width: 100%; font-size: 11px; color: #8b949e;">
+                                    <tr style="border-bottom: 1px solid #2d333b;"><td style="padding: 4px 0;">Population</td><td style="text-align: right; color: #e6edf3;">{population:,}</td></tr>
+                                    <tr><td style="padding: 4px 0;">At Risk (WUI)</td><td style="text-align: right; color: #e6edf3;">{pop_at_risk:,}</td></tr>
                                 </table>
                             </div>
-                            <div style="margin-top: 12px; padding: 10px; background: #141920; border-radius: 6px; text-align: center;">
-                                <div style="color: #8b949e; font-size: 11px; text-transform: uppercase;">NOAA Fire Events</div>
-                                <div style="color: {COLORS['fire']}; font-size: 24px; font-weight: 600;">{fire_count:,}</div>
+                            <div style="margin-top: 8px; padding: 6px; background: #141920; border-radius: 4px; text-align: center;">
+                                <div style="color: #8b949e; font-size: 10px; text-transform: uppercase;">NOAA Fire Events</div>
+                                <div style="color: {COLORS['fire']}; font-size: 18px; font-weight: 600;">{fire_count:,}</div>
                             </div>
                         </div>
                     </div>
@@ -1394,122 +1376,45 @@ def page_interactive_map():
                         primary_events = hazard_events['flood']
                         hazard_title = "Flood Risk"
                         event_label = "Flood Events"
-                        details_html = f"""
-                            <tr style="border-bottom: 1px solid #2d333b;">
-                                <td style="padding: 6px 0;">SVI Score</td>
-                                <td style="text-align: right; color: #e6edf3;">{svi:.2f}</td>
-                            </tr>
-                            <tr style="border-bottom: 1px solid #2d333b;">
-                                <td style="padding: 6px 0;">Flood Events</td>
-                                <td style="text-align: right; color: {COLORS['flood']}; font-weight: 600;">{hazard_events['flood']}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 6px 0;">Total Hazard Events</td>
-                                <td style="text-align: right; color: #e6edf3;">{sum(hazard_events.values())}</td>
-                            </tr>
-                        """
+                        details_html = f"""<tr style="border-bottom: 1px solid #2d333b;"><td style="padding: 4px 0;">{event_label}</td><td style="text-align: right; color: {COLORS['flood']}; font-weight: 600;">{hazard_events['flood']}</td></tr><tr><td style="padding: 4px 0;">Total Hazard Events</td><td style="text-align: right; color: #e6edf3;">{sum(hazard_events.values())}</td></tr>"""
                     elif hazard_key == 'wind':
                         primary_events = hazard_events['wind']
                         hazard_title = "Wind Risk"
                         event_label = "Wind Events"
-                        details_html = f"""
-                            <tr style="border-bottom: 1px solid #2d333b;">
-                                <td style="padding: 6px 0;">SVI Score</td>
-                                <td style="text-align: right; color: #e6edf3;">{svi:.2f}</td>
-                            </tr>
-                            <tr style="border-bottom: 1px solid #2d333b;">
-                                <td style="padding: 6px 0;">Wind Events</td>
-                                <td style="text-align: right; color: {COLORS['wind']}; font-weight: 600;">{hazard_events['wind']}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 6px 0;">Total Hazard Events</td>
-                                <td style="text-align: right; color: #e6edf3;">{sum(hazard_events.values())}</td>
-                            </tr>
-                        """
+                        details_html = f"""<tr style="border-bottom: 1px solid #2d333b;"><td style="padding: 4px 0;">{event_label}</td><td style="text-align: right; color: {COLORS['wind']}; font-weight: 600;">{hazard_events['wind']}</td></tr><tr><td style="padding: 4px 0;">Total Hazard Events</td><td style="text-align: right; color: #e6edf3;">{sum(hazard_events.values())}</td></tr>"""
                     elif hazard_key == 'winter':
                         primary_events = hazard_events['winter']
                         hazard_title = "Winter Storm Risk"
                         event_label = "Winter Events"
-                        details_html = f"""
-                            <tr style="border-bottom: 1px solid #2d333b;">
-                                <td style="padding: 6px 0;">SVI Score</td>
-                                <td style="text-align: right; color: #e6edf3;">{svi:.2f}</td>
-                            </tr>
-                            <tr style="border-bottom: 1px solid #2d333b;">
-                                <td style="padding: 6px 0;">Winter Events</td>
-                                <td style="text-align: right; color: {COLORS['winter']}; font-weight: 600;">{hazard_events['winter']}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 6px 0;">Total Hazard Events</td>
-                                <td style="text-align: right; color: #e6edf3;">{sum(hazard_events.values())}</td>
-                            </tr>
-                        """
+                        details_html = f"""<tr style="border-bottom: 1px solid #2d333b;"><td style="padding: 4px 0;">{event_label}</td><td style="text-align: right; color: {COLORS['winter']}; font-weight: 600;">{hazard_events['winter']}</td></tr><tr><td style="padding: 4px 0;">Total Hazard Events</td><td style="text-align: right; color: #e6edf3;">{sum(hazard_events.values())}</td></tr>"""
                     elif hazard_key == 'seismic':
                         primary_events = hazard_events['seismic']
                         hazard_title = "Seismic Risk"
                         event_label = "Seismic Events"
-                        details_html = f"""
-                            <tr style="border-bottom: 1px solid #2d333b;">
-                                <td style="padding: 6px 0;">SVI Score</td>
-                                <td style="text-align: right; color: #e6edf3;">{svi:.2f}</td>
-                            </tr>
-                            <tr style="border-bottom: 1px solid #2d333b;">
-                                <td style="padding: 6px 0;">Seismic Events</td>
-                                <td style="text-align: right; color: {COLORS['seismic']}; font-weight: 600;">{hazard_events['seismic']}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 6px 0;">Total Hazard Events</td>
-                                <td style="text-align: right; color: #e6edf3;">{sum(hazard_events.values())}</td>
-                            </tr>
-                        """
+                        details_html = f"""<tr style="border-bottom: 1px solid #2d333b;"><td style="padding: 4px 0;">{event_label}</td><td style="text-align: right; color: {COLORS['seismic']}; font-weight: 600;">{hazard_events['seismic']}</td></tr><tr><td style="padding: 4px 0;">Total Hazard Events</td><td style="text-align: right; color: #e6edf3;">{sum(hazard_events.values())}</td></tr>"""
                     else:
                         # Default/Fire fallback
                         primary_events = hazard_events['fire']
                         hazard_title = "Multi-Hazard Risk"
                         event_label = "Fire Events"
                         hazard_color = COLORS['fire']
-                        details_html = f"""
-                            <tr style="border-bottom: 1px solid #2d333b;">
-                                <td style="padding: 6px 0;">Fire Events</td>
-                                <td style="text-align: right; color: {COLORS['fire']};">{hazard_events['fire']}</td>
-                            </tr>
-                            <tr style="border-bottom: 1px solid #2d333b;">
-                                <td style="padding: 6px 0;">Flood Events</td>
-                                <td style="text-align: right; color: {COLORS['flood']};">{hazard_events['flood']}</td>
-                            </tr>
-                            <tr style="border-bottom: 1px solid #2d333b;">
-                                <td style="padding: 6px 0;">Wind Events</td>
-                                <td style="text-align: right; color: {COLORS['wind']};">{hazard_events['wind']}</td>
-                            </tr>
-                            <tr style="border-bottom: 1px solid #2d333b;">
-                                <td style="padding: 6px 0;">Winter Events</td>
-                                <td style="text-align: right; color: {COLORS['winter']};">{hazard_events['winter']}</td>
-                            </tr>
-                            <tr>
-                                <td style="padding: 6px 0;">Seismic Events</td>
-                                <td style="text-align: right; color: {COLORS['seismic']};">{hazard_events['seismic']}</td>
-                            </tr>
-                        """
+                        details_html = f"""<tr style="border-bottom: 1px solid #2d333b;"><td style="padding: 4px 0;">Fire</td><td style="text-align: right; color: {COLORS['fire']};">{hazard_events['fire']}</td></tr><tr style="border-bottom: 1px solid #2d333b;"><td style="padding: 4px 0;">Flood</td><td style="text-align: right; color: {COLORS['flood']};">{hazard_events['flood']}</td></tr><tr style="border-bottom: 1px solid #2d333b;"><td style="padding: 4px 0;">Wind</td><td style="text-align: right; color: {COLORS['wind']};">{hazard_events['wind']}</td></tr><tr style="border-bottom: 1px solid #2d333b;"><td style="padding: 4px 0;">Winter</td><td style="text-align: right; color: {COLORS['winter']};">{hazard_events['winter']}</td></tr><tr><td style="padding: 4px 0;">Seismic</td><td style="text-align: right; color: {COLORS['seismic']};">{hazard_events['seismic']}</td></tr>"""
                     
                     popup_html = f"""
-                    <div style="font-family: 'Segoe UI', sans-serif; min-width: 300px; background: #1a1f26; border-radius: 8px; overflow: hidden;">
-                        <div style="background: linear-gradient(135deg, {color} 0%, #1a1f26 100%); padding: 12px 16px;">
-                            <h3 style="margin: 0; color: #fff; font-size: 18px; font-weight: 600;">{county_name} County</h3>
-                            <div style="color: rgba(255,255,255,0.8); font-size: 13px; margin-top: 4px;">
-                                {hazard_title} | {risk_category}
-                            </div>
+                    <div style="font-family: 'Segoe UI', sans-serif; background: #1a1f26; border-radius: 6px; overflow: hidden;">
+                        <div style="background: linear-gradient(135deg, {color} 0%, #1a1f26 100%); padding: 8px 10px;">
+                            <h3 style="margin: 0; color: #fff; font-size: 14px; font-weight: 600;">{county_name} County</h3>
+                            <div style="color: rgba(255,255,255,0.85); font-size: 11px; margin-top: 2px;">{hazard_title} | {risk_category}</div>
                         </div>
-                        <div style="padding: 12px 16px;">
-                            <table style="width: 100%; font-size: 12px; color: #8b949e; border-collapse: collapse;">
-                                <tr style="border-bottom: 1px solid #2d333b;">
-                                    <td style="padding: 6px 0;">Population</td>
-                                    <td style="text-align: right; color: #e6edf3;">{population:,}</td>
-                                </tr>
+                        <div style="padding: 8px 10px;">
+                            <table style="width: 100%; font-size: 11px; color: #8b949e; border-collapse: collapse;">
+                                <tr style="border-bottom: 1px solid #2d333b;"><td style="padding: 4px 0;">Population</td><td style="text-align: right; color: #e6edf3;">{population:,}</td></tr>
+                                <tr style="border-bottom: 1px solid #2d333b;"><td style="padding: 4px 0;">SVI Score</td><td style="text-align: right; color: #e6edf3;">{svi:.2f}</td></tr>
                                 {details_html}
                             </table>
-                            <div style="margin-top: 12px; padding: 10px; background: #141920; border-radius: 6px; text-align: center;">
-                                <div style="color: #8b949e; font-size: 11px; text-transform: uppercase;">{event_label}</div>
-                                <div style="color: {hazard_color}; font-size: 24px; font-weight: 600;">{primary_events:,}</div>
+                            <div style="margin-top: 8px; padding: 6px; background: #141920; border-radius: 4px; text-align: center;">
+                                <div style="color: #8b949e; font-size: 10px; text-transform: uppercase;">{event_label}</div>
+                                <div style="color: {hazard_color}; font-size: 18px; font-weight: 600;">{primary_events:,}</div>
                             </div>
                         </div>
                     </div>
@@ -1531,7 +1436,7 @@ def page_interactive_map():
                             'fillOpacity': fo
                         },
                         tooltip=f"{county_name}: {risk_category} Risk",
-                        popup=folium.Popup(popup_html, max_width=380)
+                        popup=folium.Popup(popup_html, max_width=280)
                     ).add_to(m)
                 except:
                     pass
