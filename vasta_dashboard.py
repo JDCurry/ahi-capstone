@@ -123,27 +123,42 @@ MODEL_DISPLAY_NAME = "Hazard-LM v1.0"
 
 
 def download_model_if_needed():
-    """Download model from GitHub Releases if not present locally."""
+    """Download model from GitHub LFS media URL if not present or if only LFS pointer exists."""
     import requests
-    if MODEL_PATH.exists():
+    
+    # Check if file exists and is the actual model (not just LFS pointer ~134 bytes)
+    min_model_size = 10_000_000  # 10MB - real model is ~184MB
+    if MODEL_PATH.exists() and MODEL_PATH.stat().st_size > min_model_size:
         return True
     
     try:
         MODEL_PATH.parent.mkdir(parents=True, exist_ok=True)
-        with st.spinner("Downloading Hazard-LM model (~184MB)... This only happens once."):
-            response = requests.get(MODEL_URL, stream=True, timeout=300)
-            response.raise_for_status()
-            total_size = int(response.headers.get('content-length', 0))
-            
-            with open(MODEL_PATH, 'wb') as f:
-                downloaded = 0
-                for chunk in response.iter_content(chunk_size=8192):
-                    f.write(chunk)
-                    downloaded += len(chunk)
-            
-            return MODEL_PATH.exists()
+        print(f"Downloading Hazard-LM model from {MODEL_URL}...")
+        
+        response = requests.get(MODEL_URL, stream=True, timeout=600)
+        response.raise_for_status()
+        total_size = int(response.headers.get('content-length', 0))
+        
+        # Verify we're getting the full file, not the LFS pointer
+        if total_size < min_model_size:
+            print(f"Warning: Download size {total_size} too small, expected ~184MB")
+            return False
+        
+        with open(MODEL_PATH, 'wb') as f:
+            downloaded = 0
+            for chunk in response.iter_content(chunk_size=65536):
+                f.write(chunk)
+                downloaded += len(chunk)
+                # Progress indicator
+                if total_size > 0 and downloaded % (10 * 1024 * 1024) < 65536:
+                    pct = int(100 * downloaded / total_size)
+                    print(f"Downloaded {downloaded // (1024*1024)}MB / {total_size // (1024*1024)}MB ({pct}%)")
+        
+        print(f"Model download complete: {MODEL_PATH.stat().st_size // (1024*1024)}MB")
+        return MODEL_PATH.exists() and MODEL_PATH.stat().st_size > min_model_size
+        
     except Exception as e:
-        st.error(f"Failed to download model: {e}")
+        print(f"Failed to download model: {e}")
         return False
 # Prefer canonical WA parquet by default (falls back inside loader if missing)
 DATA_PATH = Path("data/wa_gridmet/wa_hazard_dataset.parquet/wa_hazard_dataset.parquet")
@@ -396,16 +411,22 @@ def load_hazard_model():
     global RESOLVED_MODEL_PATH, MODEL_LOAD_ERROR
     RESOLVED_MODEL_PATH = MODEL_PATH
 
-    # Download model from GitHub Releases if not present
-    if not RESOLVED_MODEL_PATH.exists():
+    # Always try to download if file is missing or too small (LFS pointer)
+    min_model_size = 10_000_000  # 10MB
+    if not RESOLVED_MODEL_PATH.exists() or RESOLVED_MODEL_PATH.stat().st_size < min_model_size:
         download_model_if_needed()
+    
+    # Verify model file is valid
+    if not RESOLVED_MODEL_PATH.exists():
+        MODEL_LOAD_ERROR = f"Model file not found: {RESOLVED_MODEL_PATH}"
+        return None, False
+    
+    if RESOLVED_MODEL_PATH.stat().st_size < min_model_size:
+        MODEL_LOAD_ERROR = f"Model file too small ({RESOLVED_MODEL_PATH.stat().st_size} bytes) - download may have failed"
+        return None, False
 
     try:
         from hazard_lm_v20 import model as h20_model
-
-        if not RESOLVED_MODEL_PATH.exists():
-            MODEL_LOAD_ERROR = f"Model file not found: {RESOLVED_MODEL_PATH}"
-            return None, False
 
         # Load checkpoint
         state = torch.load(str(RESOLVED_MODEL_PATH), map_location='cpu', weights_only=False)
