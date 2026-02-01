@@ -424,14 +424,21 @@ def inject_custom_css():
 def load_hazard_model():
     """Load Hazard-LM v2.0 model from checkpoint."""
     global RESOLVED_MODEL_PATH, MODEL_LOAD_ERROR
+    
+    print("[MODEL] Starting model load...")
 
     # Try to get existing model path or download
     model_path = get_model_path()
+    print(f"[MODEL] get_model_path() returned: {model_path}")
+    
     if model_path is None:
+        print("[MODEL] No model found, attempting download...")
         model_path = download_model_if_needed()
+        print(f"[MODEL] download_model_if_needed() returned: {model_path}")
     
     if model_path is None:
         MODEL_LOAD_ERROR = f"Model not available - download failed"
+        print(f"[MODEL] ERROR: {MODEL_LOAD_ERROR}")
         return None, False
     
     RESOLVED_MODEL_PATH = model_path
@@ -439,52 +446,73 @@ def load_hazard_model():
     # Verify model file is valid
     if not model_path.exists():
         MODEL_LOAD_ERROR = f"Model file not found: {model_path}"
+        print(f"[MODEL] ERROR: {MODEL_LOAD_ERROR}")
         return None, False
     
     file_size = model_path.stat().st_size
+    print(f"[MODEL] Model file size: {file_size:,} bytes ({file_size // (1024*1024)} MB)")
+    
     if file_size < MIN_MODEL_SIZE:
         MODEL_LOAD_ERROR = f"Model file too small ({file_size} bytes) - download may have failed"
+        print(f"[MODEL] ERROR: {MODEL_LOAD_ERROR}")
         return None, False
 
     try:
+        print("[MODEL] Importing hazard_lm_v20...")
         from hazard_lm_v20 import model as h20_model
+        print("[MODEL] hazard_lm_v20 imported successfully")
 
         # Load checkpoint
+        print(f"[MODEL] Loading checkpoint from {model_path}...")
         state = torch.load(str(model_path), map_location='cpu', weights_only=False)
+        print(f"[MODEL] Checkpoint loaded, type: {type(state)}, keys: {state.keys() if isinstance(state, dict) else 'N/A'}")
 
         # Create model with default config
+        print("[MODEL] Creating model architecture...")
         model = h20_model.create_hazard_lm()
+        print(f"[MODEL] Model created, params: {sum(p.numel() for p in model.parameters()):,}")
 
         # Extract state dict from nested structure
         sd = None
         if isinstance(state, dict):
             if 'model_state_dict' in state:
                 sd = state['model_state_dict']
+                print("[MODEL] Using 'model_state_dict' key")
             elif 'state_dict' in state:
                 sd = state['state_dict']
+                print("[MODEL] Using 'state_dict' key")
             else:
                 sd = state
+                print("[MODEL] Using checkpoint directly as state_dict")
 
         if sd is not None:
             # Try direct load first
             try:
                 model.load_state_dict(sd, strict=False)
-            except Exception:
+                print("[MODEL] State dict loaded successfully (strict=False)")
+            except Exception as load_err:
+                print(f"[MODEL] Direct load failed: {load_err}, trying per-component...")
                 # Try loading per-component
                 if isinstance(sd, dict):
                     for key in ['backbone', 'backbone_ln', 'token_embedding', 'position_embedding']:
                         if key in sd:
                             try:
                                 getattr(model, key).load_state_dict(sd[key])
+                                print(f"[MODEL] Loaded component: {key}")
                             except Exception:
-                                pass
+                                print(f"[MODEL] Failed to load component: {key}")
 
         model.eval()
+        param_sum = sum(p.sum().item() for p in model.parameters())
+        print(f"[MODEL] Model loaded successfully, param checksum: {param_sum:.4f}")
         MODEL_LOAD_ERROR = None
         return model, True
 
     except Exception as e:
+        import traceback
         MODEL_LOAD_ERROR = str(e)
+        print(f"[MODEL] EXCEPTION during load: {e}")
+        print(f"[MODEL] Traceback: {traceback.format_exc()}")
         return None, False
 
 
@@ -1215,7 +1243,7 @@ def page_interactive_map():
     with col1:
         hazard_layer = st.selectbox(
             "Hazard Layer",
-            ["Climate Fire (NOAA + Climate)", "Fire", "Flood", "Wind", "Winter", "Seismic"]
+            ["Fire", "Flood", "Wind", "Winter", "Seismic"]
         )
     with col2:
         map_style = st.selectbox(
@@ -1273,7 +1301,7 @@ def page_interactive_map():
                 stats = match.iloc[0] if len(match) > 0 else None
                 
                 # Determine score based on layer selection
-                if hazard_layer == "Climate Fire (NOAA + Climate)" and cf_data is not None:
+                if hazard_layer == "Fire" and cf_data is not None:
                     score = cf_data.get('climate_fire_risk_score', 0) / 100.0  # Normalize to 0-1
                     risk_category = cf_data.get('risk_category', 'Unknown')
                 elif stats is not None:
@@ -1301,7 +1329,7 @@ def page_interactive_map():
                     color = COLORS['success']
                 
                 # Build popup based on selected hazard layer
-                if hazard_layer in ["Climate Fire (NOAA + Climate)", "Fire"] and cf_data is not None:
+                if hazard_layer == "Fire" and cf_data is not None:
                     # Fire-specific popup with climate fire data
                     fire_count = int(cf_data.get('Fire_Count', 0))
                     climate_trend = cf_data.get('climate_trend', 'Stable')
@@ -1330,7 +1358,7 @@ def page_interactive_map():
                         <div style="background: linear-gradient(135deg, {color} 0%, #1a1f26 100%); padding: 8px 10px;">
                             <h3 style="margin: 0; color: #fff; font-size: 14px; font-weight: 600;">{county_name} County</h3>
                             <div style="color: rgba(255,255,255,0.85); font-size: 11px; margin-top: 2px;">
-                                Climate Fire Risk (NOAA events + climate indicators): {risk_score:.1f} | {risk_category} Risk
+                                Fire Risk (NOAA events + climate indicators): {risk_score:.1f} | {risk_category} Risk
                             </div>
                             <div style="color: #8b949e; font-size: 10px; margin-top: 4px;">Includes NOAA fire counts and climate trend indicators (heat / drought)</div>
                         </div>
@@ -1498,7 +1526,7 @@ def page_interactive_map():
     # County details table - hazard-specific
     st.markdown("### County Details")
     
-    if hazard_layer in ["Climate Fire (NOAA + Climate)", "Fire"] and climate_fire_df is not None:
+    if hazard_layer == "Fire" and climate_fire_df is not None:
         # Fire-specific table
         display_df = climate_fire_df[['County', 'population', 'Fire_Count', 'climate_fire_risk_score', 
                                        'risk_category', 'climate_trend', 'heat_stress', 'drought_stress']].copy()
