@@ -1043,7 +1043,7 @@ def render_sidebar():
         
         st.markdown(f"<p style='color: {COLORS['text_tertiary']}; font-size: 11px; text-transform: uppercase; margin-top: 20px;'>AI Tools</p>", unsafe_allow_html=True)
         
-        if st.button("Risk Assessments", width='stretch'):
+        if st.button("Quick Predict", width='stretch'):
             st.session_state.page = 'ai_predict'
         
         if st.button("Model Diagnostics", width='stretch'):
@@ -1051,6 +1051,9 @@ def render_sidebar():
         
         if st.button("Model Evaluation", width='stretch'):
             st.session_state.page = 'model_eval'
+        
+        if st.button("About This Project", width='stretch'):
+            st.session_state.page = 'about'
         
         st.markdown("---")
         
@@ -2175,7 +2178,7 @@ def page_seasonal_planning():
 # =============================================================================
 
 def page_ai_predictions():
-    st.markdown("## Risk Assessments")
+    st.markdown("## Quick Predict")
     
     model, model_ok = load_hazard_model()
     
@@ -2911,8 +2914,28 @@ def page_ai_predictions():
         
         # Show cached results if available
         if 'statewide_predictions' in st.session_state:
-            st.markdown('#### Cached Statewide Results')
+            st.markdown('#### Statewide Results')
             cached_df = st.session_state['statewide_predictions']
+            
+            # Show results table (persists after initial run)
+            hazards = ['fire', 'flood', 'wind', 'winter', 'seismic']
+            display_df = cached_df.copy()
+            for h in hazards:
+                col = f'{h}_p'
+                if col in display_df.columns:
+                    display_df[h.title()] = (display_df[col] * 100).round(1).astype(str) + '%'
+            st.dataframe(display_df[['county'] + [h.title() for h in hazards]], use_container_width=True, hide_index=True)
+            
+            # Download button
+            csv = cached_df.to_csv(index=False)
+            st.download_button(
+                'Download Statewide Predictions CSV',
+                data=csv,
+                file_name='statewide_predictions.csv',
+                mime='text/csv'
+            )
+            
+            st.markdown('---')
             
             # Show hazard selector for map
             hazard_choice = st.selectbox('Select hazard to display on map', ['Fire', 'Flood', 'Wind', 'Winter', 'Seismic'], index=0)
@@ -3180,7 +3203,89 @@ def page_model_evaluation():
     - **Confidence matters** — use the Model Diagnostics tab to see uncertainty estimates when available
     """)
 
-    st.info("💡 **Tip:** Use Quick Predict in the Risk Assessments tab to get current predictions for any county.")
+    st.info("Tip: Use Quick Predict to get current predictions for any county.")
+
+
+# =============================================================================
+# PAGE: ABOUT THIS PROJECT
+# =============================================================================
+
+def page_about():
+    st.markdown("## About This Project")
+    
+    st.markdown("""
+    ### Adaptive Hazard Intelligence System
+    
+    This dashboard is a capstone project demonstrating the application of machine learning 
+    to multi-hazard risk assessment for emergency management in Washington State.
+    
+    **Author:** Joshua D. Curry  
+    **Institution:** Pierce College  
+    **Expected Graduation:** June 2026
+    
+    ---
+    
+    ### Research Papers
+    
+    This work is supported by two peer-reviewed publications on SSRN:
+    """)
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.markdown("""
+        **Paper 1: Hazard-LM Architecture**
+        
+        Technical details on the transformer-based model architecture, 
+        training methodology, and calibration approach.
+        
+        [View on SSRN](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5953096)
+        """)
+    
+    with col2:
+        st.markdown("""
+        **Paper 2: Multi-Hazard Framework**
+        
+        Application of the model to Washington State's five primary 
+        natural hazards: fire, flood, wind, winter storms, and seismic events.
+        
+        [View on SSRN](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5959898)
+        """)
+    
+    st.markdown("---")
+    
+    st.markdown("""
+    ### Model Overview
+    
+    **Hazard-LM v1.0** is a 136-million parameter transformer model trained on:
+    - 79,000+ historical hazard events (2000-2024)
+    - NOAA Storm Events Database
+    - GridMET climate data (temperature, precipitation, humidity, wind)
+    - USGS seismic records
+    - MTBS fire perimeter data
+    
+    The model produces calibrated probability estimates for five hazard types,
+    enabling emergency managers to make data-driven resource allocation decisions.
+    
+    ### Key Features
+    
+    - **Calibrated Outputs:** Temperature scaling ensures predicted probabilities match real-world frequencies
+    - **County-Level Resolution:** Predictions available for all 39 Washington counties
+    - **Multi-Hazard:** Single model handles fire, flood, wind, winter, and seismic risk
+    - **Uncertainty Quantification:** Model confidence estimates help prioritize response
+    
+    ---
+    
+    ### Source Code & Data
+    
+    This project is deployed on Streamlit Cloud from the GitHub repository.
+    
+    For questions or collaboration inquiries, please reach out through the SSRN paper contact information.
+    """)
+    
+    # Model status footer
+    st.markdown("---")
+    st.caption(f"Model: {MODEL_DISPLAY_NAME} | Device: {DEVICE} | Dashboard Version: 2.0")
 
 
 # =============================================================================
@@ -3221,6 +3326,8 @@ def main():
         page_model_diagnostics()
     elif current_page == 'model_eval':
         page_model_evaluation()
+    elif current_page == 'about':
+        page_about()
     else:
         page_executive_dashboard()
 
