@@ -2584,82 +2584,83 @@ def page_ai_predictions():
 
             return None
 
-        summary_path = _find_preferred_summary(selected_county, sel_date)
-        summary_obj = None
-        provenance = None
-        if summary_path is not None:
-            try:
-                summary_obj = json.load(open(summary_path))
-                provenance = str(summary_path)
-            except Exception:
-                summary_obj = None
+        # ===== RISK SUMMARIES SECTION (COMMENTED OUT - Decision Audit provides this functionality) =====
+        # summary_path = _find_preferred_summary(selected_county, sel_date)
+        # summary_obj = None
+        # provenance = None
+        # if summary_path is not None:
+        #     try:
+        #         summary_obj = json.load(open(summary_path))
+        #         provenance = str(summary_path)
+        #     except Exception:
+        #         summary_obj = None
 
-        # If we have an immediate mistral summary from quick predict, prefer that
-        if summary_obj is None and 'last_quick_prediction' in st.session_state:
-            lq = st.session_state['last_quick_prediction']
-            ms = lq.get('mistral_summary')
-            if ms:
-                summary_obj = ms
-                provenance = 'in-memory (last_quick_prediction)'
+        # # If we have an immediate mistral summary from quick predict, prefer that
+        # if summary_obj is None and 'last_quick_prediction' in st.session_state:
+        #     lq = st.session_state['last_quick_prediction']
+        #     ms = lq.get('mistral_summary')
+        #     if ms:
+        #         summary_obj = ms
+        #         provenance = 'in-memory (last_quick_prediction)'
 
-        # If still no summary, try deterministic fallback from packet if available
-        if summary_obj is None:
-            try:
-                from utils.llm_explainer import _fallback_summarize
-            except Exception:
-                _fallback_summarize = None
-            # try to find risk packet
-            rp = None
-            rp_dir = Path('outputs/hazard_lm/risk_packets')
-            if rp_dir.exists():
-                for p in rp_dir.glob(f'*{selected_county}*.json'):
-                    rp = p
-                    break
-            if rp is not None and _fallback_summarize is not None:
-                try:
-                    packet = json.load(open(rp))
-                    summary_obj = _fallback_summarize(packet)
-                    provenance = str(rp)
-                except Exception:
-                    summary_obj = None
+        # # If still no summary, try deterministic fallback from packet if available
+        # if summary_obj is None:
+        #     try:
+        #         from utils.llm_explainer import _fallback_summarize
+        #     except Exception:
+        #         _fallback_summarize = None
+        #     # try to find risk packet
+        #     rp = None
+        #     rp_dir = Path('outputs/hazard_lm/risk_packets')
+        #     if rp_dir.exists():
+        #         for p in rp_dir.glob(f'*{selected_county}*.json'):
+        #             rp = p
+        #             break
+        #     if rp is not None and _fallback_summarize is not None:
+        #         try:
+        #             packet = json.load(open(rp))
+        #             summary_obj = _fallback_summarize(packet)
+        #             provenance = str(rp)
+        #         except Exception:
+        #             summary_obj = None
 
-        # Render compact card
-        st.markdown('### Risk Summaries')
-        if summary_obj is None:
-            st.info('No summary available. Run Quick Predict to generate a summary.')
-        else:
-            pub = summary_obj.get('public_summary') if isinstance(summary_obj, dict) else str(summary_obj)
-            eoc = summary_obj.get('eoc_brief', '') if isinstance(summary_obj, dict) else ''
-            drivers = summary_obj.get('drivers', []) if isinstance(summary_obj, dict) else []
-            conf = summary_obj.get('confidence_band', 'Not available') if isinstance(summary_obj, dict) else 'Not available'
+        # # Render compact card
+        # st.markdown('### Risk Summaries')
+        # if summary_obj is None:
+        #     st.info('No summary available. Run Quick Predict to generate a summary.')
+        # else:
+        #     pub = summary_obj.get('public_summary') if isinstance(summary_obj, dict) else str(summary_obj)
+        #     eoc = summary_obj.get('eoc_brief', '') if isinstance(summary_obj, dict) else ''
+        #     drivers = summary_obj.get('drivers', []) if isinstance(summary_obj, dict) else []
+        #     conf = summary_obj.get('confidence_band', 'Not available') if isinstance(summary_obj, dict) else 'Not available'
 
-            # Compact card layout
-            st.markdown(f"<div style='background:{COLORS['card_bg']}; padding:12px; border-radius:6px;'><div style='font-weight:700; color:{COLORS['text_primary']};'>{pub}</div><div style='color:{COLORS['text_tertiary']}; margin-top:6px;'>Drivers: {', '.join(drivers[:2]) if drivers else 'None reported'} — Confidence: {conf}</div></div>", unsafe_allow_html=True)
+        #     # Compact card layout
+        #     st.markdown(f"<div style='background:{COLORS['card_bg']}; padding:12px; border-radius:6px;'><div style='font-weight:700; color:{COLORS['text_primary']};'>{pub}</div><div style='color:{COLORS['text_tertiary']}; margin-top:6px;'>Drivers: {', '.join(drivers[:2]) if drivers else 'None reported'} — Confidence: {conf}</div></div>", unsafe_allow_html=True)
 
-            # EOC brief collapsed
-            with st.expander('EOC Brief', expanded=False):
-                if eoc:
-                    st.markdown(eoc)
-                else:
-                    st.markdown('No EOC brief available in the summary.')
+        #     # EOC brief collapsed
+        #     with st.expander('EOC Brief', expanded=False):
+        #         if eoc:
+        #             st.markdown(eoc)
+        #         else:
+        #             st.markdown('No EOC brief available in the summary.')
 
-            # provenance and actions (only show to advanced users)
-            try:
-                show_adv = bool(st.session_state.get('show_advanced', False))
-            except Exception:
-                show_adv = False
-            if show_adv:
-                prov_line = provenance or 'generated'
-                # show only filename (not full path) for privacy unless advanced
-                try:
-                    prov_display = Path(prov_line).name if isinstance(prov_line, str) and '/' in prov_line else prov_line
-                except Exception:
-                    prov_display = prov_line
-                st.markdown(f"<div style='color:{COLORS['text_tertiary']}; font-size:11px; margin-top:8px;'>Provenance: {prov_display}</div>", unsafe_allow_html=True)
+        #     # provenance and actions (only show to advanced users)
+        #     try:
+        #         show_adv = bool(st.session_state.get('show_advanced', False))
+        #     except Exception:
+        #         show_adv = False
+        #     if show_adv:
+        #         prov_line = provenance or 'generated'
+        #         # show only filename (not full path) for privacy unless advanced
+        #         try:
+        #             prov_display = Path(prov_line).name if isinstance(prov_line, str) and '/' in prov_line else prov_line
+        #         except Exception:
+        #             prov_display = prov_line
+        #         st.markdown(f"<div style='color:{COLORS['text_tertiary']}; font-size:11px; margin-top:8px;'>Provenance: {prov_display}</div>", unsafe_allow_html=True)
 
-            # LLM summarization disabled for cloud deployment
-            # (Regenerate button removed - requires local Mistral/llama-cpp-python)
-        
+        #     # LLM summarization disabled for cloud deployment
+        #     # (Regenerate button removed - requires local Mistral/llama-cpp-python)
+        # ===== END RISK SUMMARIES SECTION =====
 
         # If a precomputed calibrated JSON exists for this county, load and show it
         def _load_county_json(name: str):
