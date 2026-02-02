@@ -96,6 +96,16 @@ except Exception as _inf_err:
     predict_county_risks = None
     predict_county_risks_simple = None
 
+# Decision audit module for evidentiary basis
+try:
+    from decision_audit import build_decision_audit, render_decision_audit_html, render_decision_audit_compact
+    DECISION_AUDIT_AVAILABLE = True
+except ImportError:
+    DECISION_AUDIT_AVAILABLE = False
+    build_decision_audit = None
+    render_decision_audit_html = None
+    render_decision_audit_compact = None
+
 # LLM helpers not available on cloud deployment
 load_local_llm = None
 generate_risk_summary = None
@@ -2186,13 +2196,12 @@ def page_ai_predictions():
         st.warning("Hazard-LM model not available. Ensure outputs/hazard_lm/pretrain_finetune/finetune/best_model.pt exists.")
         return
     
-    # Model loaded message commented out - no longer needed
-    # st.markdown(f"""
-    # <div class="alert-box alert-success">
-    #     <strong>MODEL LOADED</strong><br>
-    #     {MODEL_DISPLAY_NAME} is ready for inference. Device: {DEVICE}
-    # </div>
-    # """, unsafe_allow_html=True)
+    st.markdown(f"""
+    <div class="alert-box alert-success">
+        <strong>MODEL LOADED</strong><br>
+        {MODEL_DISPLAY_NAME} is ready for inference. Device: {DEVICE}
+    </div>
+    """, unsafe_allow_html=True)
 
     # Risk Context: public-facing explanation
     st.markdown(f"""
@@ -2305,6 +2314,7 @@ def page_ai_predictions():
                          style="width: 100%; height: 100%; object-fit: cover;" 
                          alt="{selected_county} County">
                 </div>
+                <p style="text-align: center; color: {COLORS['text_secondary']}; font-size: 12px; margin-top: 4px;">{selected_county} County</p>
                 """, unsafe_allow_html=True)
             with col_info:
                 st.markdown(f"""
@@ -2452,7 +2462,7 @@ def page_ai_predictions():
                         **What the percentages mean:**
                         - These are **relative risk probabilities** for the {MAX_FORECAST_DAYS}-day forecast window
                         - They represent the model's confidence that hazard conditions will be present, not the certainty of an event
-                        - Values are calibrated against historical county-level data (2000-2025)
+                        - Values are calibrated against historical county-level data (2010-2024)
                         
                         **Risk level thresholds:**
                         | Probability | Level | Recommended Response |
@@ -2468,6 +2478,56 @@ def page_ai_predictions():
                         - Always cross-reference with NWS forecasts and local observations
                         - Seismic risk is based on long-term patterns, not short-term prediction
                         """)
+                    
+                    # Decision Audit - Evidentiary basis for predictions
+                    if DECISION_AUDIT_AVAILABLE and sorted_risks:
+                        with st.expander("Decision Audit (Evidentiary Basis)", expanded=False):
+                            st.markdown("""
+                            **What is this?** The Decision Audit provides the evidentiary basis for 
+                            each risk prediction. Use this information to support defensible decisions 
+                            and cite specific data sources in briefings.
+                            """)
+                            
+                            # Build audit for top 2 hazards
+                            for hazard, prob in sorted_risks[:2]:
+                                try:
+                                    audit = build_decision_audit(
+                                        county=selected_county,
+                                        hazard=hazard,
+                                        probability=prob,
+                                        county_stats=county_stats,
+                                        forecast_date=sel_date,
+                                        horizon_days=MAX_FORECAST_DAYS
+                                    )
+                                    
+                                    # Render the audit
+                                    audit_html = render_decision_audit_html(audit, COLORS)
+                                    st.markdown(audit_html, unsafe_allow_html=True)
+                                    
+                                except Exception as e:
+                                    st.warning(f"Could not generate audit for {hazard}: {e}")
+                            
+                            # Data sources reference
+                            st.markdown("**Data Sources:**")
+                            st.markdown("""
+                            | Source | Data Provided |
+                            |--------|---------------|
+                            | NOAA GridMET | Daily weather variables |
+                            | NOAA Storm Events | Historical hazard events |
+                            | US Census | Population demographics |
+                            | CDC SVI | Social vulnerability scores |
+                            | USGS NLCD | Land cover classification |
+                            | USGS Earthquakes | Seismic event catalog |
+                            | FEMA | Disaster declarations |
+                            """)
+                            
+                            st.markdown(f"""
+                            <p style="color: {COLORS['text_tertiary']}; font-size: 11px; margin-top: 12px;">
+                            Model: Hazard-LM v1.0 | Training: 370,000+ observations | 
+                            Validation: Held-out test set (37,039 samples) | 
+                            Calibration: Diffusion attention (Curry, 2025)
+                            </p>
+                            """, unsafe_allow_html=True)
                     
                     # Original LLM summary if available
                     try:
@@ -2563,43 +2623,42 @@ def page_ai_predictions():
                 except Exception:
                     summary_obj = None
 
-        # Risk Summaries section commented out for now
-        # # Render compact card
-        # st.markdown('### Risk Summaries')
-        # if summary_obj is None:
-        #     st.info('No summary available. Run Quick Predict to generate a summary.')
-        # else:
-        #     pub = summary_obj.get('public_summary') if isinstance(summary_obj, dict) else str(summary_obj)
-        #     eoc = summary_obj.get('eoc_brief', '') if isinstance(summary_obj, dict) else ''
-        #     drivers = summary_obj.get('drivers', []) if isinstance(summary_obj, dict) else []
-        #     conf = summary_obj.get('confidence_band', 'Not available') if isinstance(summary_obj, dict) else 'Not available'
+        # Render compact card
+        st.markdown('### Risk Summaries')
+        if summary_obj is None:
+            st.info('No summary available. Run Quick Predict to generate a summary.')
+        else:
+            pub = summary_obj.get('public_summary') if isinstance(summary_obj, dict) else str(summary_obj)
+            eoc = summary_obj.get('eoc_brief', '') if isinstance(summary_obj, dict) else ''
+            drivers = summary_obj.get('drivers', []) if isinstance(summary_obj, dict) else []
+            conf = summary_obj.get('confidence_band', 'Not available') if isinstance(summary_obj, dict) else 'Not available'
 
-        #     # Compact card layout
-        #     st.markdown(f"<div style='background:{COLORS['card_bg']}; padding:12px; border-radius:6px;'><div style='font-weight:700; color:{COLORS['text_primary']};'>{pub}</div><div style='color:{COLORS['text_tertiary']}; margin-top:6px;'>Drivers: {', '.join(drivers[:2]) if drivers else 'None reported'} — Confidence: {conf}</div></div>", unsafe_allow_html=True)
+            # Compact card layout
+            st.markdown(f"<div style='background:{COLORS['card_bg']}; padding:12px; border-radius:6px;'><div style='font-weight:700; color:{COLORS['text_primary']};'>{pub}</div><div style='color:{COLORS['text_tertiary']}; margin-top:6px;'>Drivers: {', '.join(drivers[:2]) if drivers else 'None reported'} — Confidence: {conf}</div></div>", unsafe_allow_html=True)
 
-        #     # EOC brief collapsed
-        #     with st.expander('EOC Brief', expanded=False):
-        #         if eoc:
-        #             st.markdown(eoc)
-        #         else:
-        #             st.markdown('No EOC brief available in the summary.')
+            # EOC brief collapsed
+            with st.expander('EOC Brief', expanded=False):
+                if eoc:
+                    st.markdown(eoc)
+                else:
+                    st.markdown('No EOC brief available in the summary.')
 
-        #     # provenance and actions (only show to advanced users)
-        #     try:
-        #         show_adv = bool(st.session_state.get('show_advanced', False))
-        #     except Exception:
-        #         show_adv = False
-        #     if show_adv:
-        #         prov_line = provenance or 'generated'
-        #         # show only filename (not full path) for privacy unless advanced
-        #         try:
-        #             prov_display = Path(prov_line).name if isinstance(prov_line, str) and '/' in prov_line else prov_line
-        #         except Exception:
-        #             prov_display = prov_line
-        #         st.markdown(f"<div style='color:{COLORS['text_tertiary']}; font-size:11px; margin-top:8px;'>Provenance: {prov_display}</div>", unsafe_allow_html=True)
+            # provenance and actions (only show to advanced users)
+            try:
+                show_adv = bool(st.session_state.get('show_advanced', False))
+            except Exception:
+                show_adv = False
+            if show_adv:
+                prov_line = provenance or 'generated'
+                # show only filename (not full path) for privacy unless advanced
+                try:
+                    prov_display = Path(prov_line).name if isinstance(prov_line, str) and '/' in prov_line else prov_line
+                except Exception:
+                    prov_display = prov_line
+                st.markdown(f"<div style='color:{COLORS['text_tertiary']}; font-size:11px; margin-top:8px;'>Provenance: {prov_display}</div>", unsafe_allow_html=True)
 
-        #     # LLM summarization disabled for cloud deployment
-        #     # (Regenerate button removed - requires local Mistral/llama-cpp-python)
+            # LLM summarization disabled for cloud deployment
+            # (Regenerate button removed - requires local Mistral/llama-cpp-python)
         
 
         # If a precomputed calibrated JSON exists for this county, load and show it
@@ -2670,8 +2729,8 @@ def page_ai_predictions():
 
         temps_found = _find_county_temps(selected_county)
         # Hide technical temperature file paths from general users; keep behavior internal
-        # if not temps_found:
-        #     st.info('No per-county temperature calibration found yet. A per-county temperature file will be created from available defaults, or the model will generate calibration on-the-fly.')
+        if not temps_found:
+            st.info('No per-county temperature calibration found yet. A per-county temperature file will be created from available defaults, or the model will generate calibration on-the-fly.')
 
         # Ensure we have a per-county temps JSON (create lightweight fallback if needed)
         def _ensure_county_temps(name: str):
@@ -3145,7 +3204,7 @@ def page_model_diagnostics():
     emergencies - it looks at patterns from the past to estimate future risk.
     
     **How it works in simple terms:**
-    1. **It learns from history** - The model studied over 370,000 county-day observations (2000-2025) across all 39 Washington counties
+    1. **It learns from history** - The model studied over 156,000 days of data across all 39 Washington counties
     2. **It watches the weather** - Temperature, humidity, wind, and fire weather conditions over 14-day windows
     3. **It knows the land** - Forest, urban, agricultural areas all have different risk profiles (via NLCD land cover data)
     4. **It understands context** - Demographics, infrastructure, and social vulnerability factors
@@ -3189,9 +3248,10 @@ def page_model_diagnostics():
     st.markdown("**Completed (this project)**")
     st.markdown("""
     - Trained Hazard-LM v1.0 on 370,000+ county-day observations (2000-2025) across 39 Washington counties
-    - Achieved strong discrimination: Fire AUC 0.96, Winter AUC 0.96, Wind AUC 0.90, Flood AUC 0.90, Seismic AUC 0.85
+    - Achieved strong discrimination: Fire AUC 0.89, Winter AUC 0.94, Wind AUC 0.87, Flood AUC 0.83, Seismic AUC 0.77
     - Implemented diffusion-based attention mechanism in temporal encoder for improved calibration
     - Applied per-hazard temperature scaling to improve probability calibration (ECE reduced 55-59% for fire/seismic)
+    - Integrated local LLM summarization (Mistral-7B) for plain-language risk explanations
     - Built interactive dashboard with Quick Predict, statewide predictions, and county-level risk assessment
     - Validated on 37,039 held-out test samples with comprehensive calibration analysis
     """)
@@ -3249,11 +3309,11 @@ def page_model_evaluation():
     
     # Performance metrics table
     performance_data = [
-        {"Hazard": "🔥 Fire", "AUC": 0.96, "Quality": "Excellent", "Notes": "Strong weather signal from ERC, temperature, humidity"},
-        {"Hazard": "❄️ Winter", "AUC": 0.96, "Quality": "Excellent", "Notes": "Clear seasonal patterns, temperature-driven"},
-        {"Hazard": "💨 Wind", "AUC": 0.90, "Quality": "Excellent", "Notes": "Captures storm patterns from temporal features"},
-        {"Hazard": "🌊 Flood", "AUC": 0.90, "Quality": "Excellent", "Notes": "Precipitation and streamflow patterns"},
-        {"Hazard": "🌋 Seismic", "AUC": 0.85, "Quality": "Good", "Notes": "Historical patterns; earthquakes less predictable"},
+        {"Hazard": "🔥 Fire", "AUC": 0.89, "Quality": "Excellent", "Notes": "Strong weather signal from ERC, temperature, humidity"},
+        {"Hazard": "❄️ Winter", "AUC": 0.94, "Quality": "Excellent", "Notes": "Clear seasonal patterns, temperature-driven"},
+        {"Hazard": "💨 Wind", "AUC": 0.87, "Quality": "Good", "Notes": "Captures storm patterns from temporal features"},
+        {"Hazard": "🌊 Flood", "AUC": 0.83, "Quality": "Good", "Notes": "Precipitation and streamflow patterns"},
+        {"Hazard": "🌋 Seismic", "AUC": 0.77, "Quality": "Good", "Notes": "Historical patterns; earthquakes less predictable"},
     ]
     
     st.dataframe(pd.DataFrame(performance_data), use_container_width=True, hide_index=True)
@@ -3261,7 +3321,7 @@ def page_model_evaluation():
     # Visual AUC bar chart
     fig = go.Figure()
     hazards = ["Fire", "Winter", "Wind", "Flood", "Seismic"]
-    aucs = [0.96, 0.96, 0.90, 0.90, 0.85]
+    aucs = [0.89, 0.94, 0.87, 0.83, 0.77]
     colors = [COLORS.get('fire', '#ff6b6b'), COLORS.get('winter', '#74c0fc'), 
               COLORS.get('wind', '#63e6be'), COLORS.get('flood', '#4dabf7'), 
               COLORS.get('seismic', '#da77f2')]
@@ -3337,12 +3397,10 @@ def page_about():
     st.markdown("## About This Project")
     
     st.markdown("""
-    ### Adaptive Hazard Intelligence (AHI)
+    ### Adaptive Hazard Intelligence System
     
-    This capstone project demonstrates the application of machine learning to multi-hazard 
-    risk assessment for emergency management in Washington State. The core innovation is 
-    **Hazard-LM**, a transformer-based model that synthesizes climate, seismic, and historical 
-    event data to generate calibrated risk probabilities across five hazard categories.
+    This dashboard is a capstone project demonstrating the application of machine learning 
+    to multi-hazard risk assessment for emergency management in Washington State.
     
     **Author:** Joshua D. Curry  
     **Institution:** Pierce College Fort Steilacoom  
@@ -3351,22 +3409,13 @@ def page_about():
     
     ---
     
-    ### Capstone Context
+    ### Capstone Course
     
-    **EM 470 Emergency Management Capstone**
+    **EM 470 Emergency Management Capstone** (5 credits)
     
-    This project serves as the culminating academic experience for the BAS-EM program, 
-    demonstrating practical application of emergency management principles through an 
-    interdisciplinary approach combining:
-    
-    - **Emergency Management Theory:** Risk assessment frameworks and resource prioritization
-    - **Data Science:** Feature engineering from multi-source hazard datasets
-    - **Machine Learning:** Custom transformer architecture for sequence modeling
-    - **Applied Research:** Novel attention mechanisms documented in peer-reviewed preprints
-    
-    The project addresses a real-world problem — helping emergency managers make data-driven 
-    decisions about resource allocation during multi-hazard scenarios — while integrating 
-    program knowledge into a scalable, deployable solution.
+    The Capstone is a culminating academic and intellectual experience demonstrating learning 
+    acquisition and practical application from all courses, theories, techniques, and content 
+    taught in the Bachelor of Applied Science in Emergency Management Program.
     
     ---
     
