@@ -3028,7 +3028,7 @@ def page_ai_predictions():
                 # Download button
                 csv = statewide_df.to_csv(index=False)
                 st.download_button(
-                    '📥 Download Statewide Predictions CSV',
+                    'Download Statewide Predictions',
                     data=csv,
                     file_name=f'statewide_predictions_{target_date}.csv',
                     mime='text/csv'
@@ -3053,7 +3053,7 @@ def page_ai_predictions():
             # Download button
             csv = cached_df.to_csv(index=False)
             st.download_button(
-                'Download Statewide Predictions CSV',
+                'Download Statewide Predictions',
                 data=csv,
                 file_name='statewide_predictions.csv',
                 mime='text/csv'
