@@ -194,14 +194,14 @@ def _generate_calibration_statement(hazard: str, probability: float, county: str
 
 def render_decision_audit_html(audit: dict, colors: dict) -> str:
     """
-    Render the decision audit as HTML for Streamlit display.
+    Render the decision audit as markdown for Streamlit display.
     
     Args:
         audit: Decision audit dictionary from build_decision_audit
         colors: Color scheme dictionary from dashboard
     
     Returns:
-        HTML string for st.markdown(unsafe_allow_html=True)
+        Markdown string for st.markdown()
     """
     hazard = audit['hazard']
     prob_pct = audit['probability_pct']
@@ -225,51 +225,27 @@ def render_decision_audit_html(audit: dict, colors: dict) -> str:
     seasonal = audit['seasonal_context']
     is_primary = "Yes" if seasonal['is_primary'] else "No"
     
-    # Build HTML table
-    html = f"""
-    <div style="background: {colors.get('card_bg', '#1a1f26')}; border-radius: 8px; padding: 16px; margin: 16px 0; border-left: 4px solid {colors.get(hazard, colors.get('primary', '#0d7dc1'))};">
-        <h4 style="color: {colors.get('text_primary', '#ffffff')}; margin: 0 0 12px 0;">
-            Decision Audit: {county} County - {hazard.title()} Risk ({prob_pct})
-        </h4>
-        
-        <table style="width: 100%; border-collapse: collapse; font-size: 14px;">
-            <tr style="border-bottom: 1px solid {colors.get('border', '#2d3748')};">
-                <td style="padding: 8px 0; color: {colors.get('text_secondary', '#a0aec0')}; width: 40%;">Historical events (2000-2025)</td>
-                <td style="padding: 8px 0; color: {colors.get('text_primary', '#ffffff')};">{events_str} {hazard} events</td>
-            </tr>
-            <tr style="border-bottom: 1px solid {colors.get('border', '#2d3748')};">
-                <td style="padding: 8px 0; color: {colors.get('text_secondary', '#a0aec0')};">Training observations</td>
-                <td style="padding: 8px 0; color: {colors.get('text_primary', '#ffffff')};">{days_str} county-days</td>
-            </tr>
-            <tr style="border-bottom: 1px solid {colors.get('border', '#2d3748')};">
-                <td style="padding: 8px 0; color: {colors.get('text_secondary', '#a0aec0')};">Current season</td>
-                <td style="padding: 8px 0; color: {colors.get('text_primary', '#ffffff')};">{seasonal['season']} ({seasonal['month']})</td>
-            </tr>
-            <tr style="border-bottom: 1px solid {colors.get('border', '#2d3748')};">
-                <td style="padding: 8px 0; color: {colors.get('text_secondary', '#a0aec0')};">Primary hazard this season?</td>
-                <td style="padding: 8px 0; color: {colors.get('text_primary', '#ffffff')};">{is_primary}</td>
-            </tr>
-            <tr style="border-bottom: 1px solid {colors.get('border', '#2d3748')};">
-                <td style="padding: 8px 0; color: {colors.get('text_secondary', '#a0aec0')};">Model discrimination (AUC)</td>
-                <td style="padding: 8px 0; color: {colors.get('text_primary', '#ffffff')};">{auc:.2f} ({auc_interp})</td>
-            </tr>
-            <tr>
-                <td style="padding: 8px 0; color: {colors.get('text_secondary', '#a0aec0')};">Calibration method</td>
-                <td style="padding: 8px 0; color: {colors.get('text_primary', '#ffffff')};">{model['calibration_method']}</td>
-            </tr>
-        </table>
-        
-        <p style="color: {colors.get('text_secondary', '#a0aec0')}; font-style: italic; margin: 12px 0 0 0; font-size: 13px; line-height: 1.5;">
-            {audit['calibration_statement']}
-        </p>
-        
-        <p style="color: {colors.get('text_tertiary', '#718096')}; font-size: 11px; margin: 12px 0 0 0;">
-            Data sources: {', '.join(list(audit['data_sources'].keys())[:4])} | Model: {model['name']}
-        </p>
-    </div>
-    """
+    # Build markdown table (renders better in Streamlit)
+    markdown = f"""
+**Decision Audit: {county} County - {hazard.title()} Risk ({prob_pct})**
+
+| Factor | Value |
+|--------|-------|
+| Historical events (2000-2025) | {events_str} {hazard} events |
+| Training observations | {days_str} county-days |
+| Current season | {seasonal['season']} ({seasonal['month']}) |
+| Primary hazard this season? | {is_primary} |
+| Model discrimination (AUC) | {auc:.2f} ({auc_interp}) |
+| Calibration method | {model['calibration_method']} |
+
+*{audit['calibration_statement']}*
+
+<small>Data sources: {', '.join(list(audit['data_sources'].keys())[:4])} | Model: {model['name']}</small>
+
+---
+"""
     
-    return html
+    return markdown
 
 
 def render_decision_audit_compact(audit: dict, colors: dict) -> str:
@@ -285,12 +261,7 @@ def render_decision_audit_compact(audit: dict, colors: dict) -> str:
     county_data = audit.get('county_data', {})
     events = county_data.get('historical_events', 0)
     
-    return f"""
-    <p style="color: {colors.get('text_tertiary', '#718096')}; font-size: 12px; margin: 8px 0; padding: 8px; background: {colors.get('elevated_bg', '#1f2430')}; border-radius: 4px;">
-        <strong>Audit:</strong> {prob_pct} {hazard} risk based on {events:,} historical events in {county} County (2000-2025). 
-        Model AUC: {model['auc']:.2f}. Calibration: diffusion attention + temperature scaling.
-    </p>
-    """
+    return f"**Audit:** {prob_pct} {hazard} risk based on {events:,} historical events in {county} County (2000-2025). Model AUC: {model['auc']:.2f}. Calibration: diffusion attention + temperature scaling."
 
 
 # Export main functions

@@ -2729,8 +2729,8 @@ def page_ai_predictions():
 
         temps_found = _find_county_temps(selected_county)
         # Hide technical temperature file paths from general users; keep behavior internal
-        if not temps_found:
-            st.info('No per-county temperature calibration found yet. A per-county temperature file will be created from available defaults, or the model will generate calibration on-the-fly.')
+        # if not temps_found:
+        #     st.info('No per-county temperature calibration found yet. A per-county temperature file will be created from available defaults, or the model will generate calibration on-the-fly.')
 
         # Ensure we have a per-county temps JSON (create lightweight fallback if needed)
         def _ensure_county_temps(name: str):
