@@ -2196,12 +2196,13 @@ def page_ai_predictions():
         st.warning("Hazard-LM model not available. Ensure outputs/hazard_lm/pretrain_finetune/finetune/best_model.pt exists.")
         return
     
-    st.markdown(f"""
-    <div class="alert-box alert-success">
-        <strong>MODEL LOADED</strong><br>
-        {MODEL_DISPLAY_NAME} is ready for inference. Device: {DEVICE}
-    </div>
-    """, unsafe_allow_html=True)
+    # MODEL LOADED message commented out - visible from other dashboard areas
+    # st.markdown(f"""
+    # <div class="alert-box alert-success">
+    #     <strong>MODEL LOADED</strong><br>
+    #     {MODEL_DISPLAY_NAME} is ready for inference. Device: {DEVICE}
+    # </div>
+    # """, unsafe_allow_html=True)
 
     # Risk Context: public-facing explanation
     st.markdown(f"""
