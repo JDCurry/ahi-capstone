@@ -235,8 +235,6 @@ def render_decision_audit_html(audit: dict, colors: dict) -> str:
 | Training observations | {days_str} county-days |
 | Current season | {seasonal['season']} ({seasonal['month']}) |
 | Primary hazard this season? | {is_primary} |
-| Model discrimination (AUC) | {auc:.2f} ({auc_interp}) |
-| Calibration method | {model['calibration_method']} |
 
 *{audit['calibration_statement']}*
 
