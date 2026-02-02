@@ -2219,8 +2219,8 @@ def page_ai_predictions():
     #try:
      #   if st.sidebar.button('Seasonal Planner', use_container_width=True):
       #      st.session_state.page = 'seasonal'
-    except Exception:
-        pass
+    #except Exception:
+     #   pass
     
     # Get latest data for county
     county_df = df[df['county'] == selected_county].sort_values('date', ascending=False)
