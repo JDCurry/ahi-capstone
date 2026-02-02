@@ -2216,9 +2216,9 @@ def page_ai_predictions():
     selected_county = st.selectbox("Select County for Prediction", sorted(county_stats['county'].tolist()))
     
     # Seasonal planner link: provide quick access to seasonal/historical planning
-    try:
-        if st.sidebar.button('Seasonal Planner', use_container_width=True):
-            st.session_state.page = 'seasonal'
+    #try:
+     #   if st.sidebar.button('Seasonal Planner', use_container_width=True):
+      #      st.session_state.page = 'seasonal'
     except Exception:
         pass
     
