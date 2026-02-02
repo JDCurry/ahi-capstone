@@ -2137,15 +2137,15 @@ def page_mitigation_planning():
     #st.markdown("## Seasonal Planner & Historical Analysis")
     #df = load_hazard_data()
     #if df is None:
-        st.error('No hazard dataset found.')
-        return
+    #    st.error('No hazard dataset found.')
+    #    return
 
     # Season choices
     #seasons = {
-        'Winter (Dec-Feb)': [12,1,2],
-        'Spring (Mar-May)': [3,4,5],
-        'Summer (Jun-Aug)': [6,7,8],
-        'Fall (Sep-Nov)': [9,10,11]
+     #   'Winter (Dec-Feb)': [12,1,2],
+     #   'Spring (Mar-May)': [3,4,5],
+     #   'Summer (Jun-Aug)': [6,7,8],
+     #   'Fall (Sep-Nov)': [9,10,11]
     #}
 
     county_choices = ['Statewide'] + sorted(df['county'].unique().tolist())
