@@ -2158,29 +2158,29 @@ def page_mitigation_planning():
      #   'Fall (Sep-Nov)': [9,10,11]
     #}
 
-    county_choices = ['Statewide'] + sorted(df['county'].unique().tolist())
-    county = st.selectbox('County', county_choices)
-    season = st.selectbox('Season', list(seasons.keys()))
+    #county_choices = ['Statewide'] + sorted(df['county'].unique().tolist())
+    #county = st.selectbox('County', county_choices)
+    #season = st.selectbox('Season', list(seasons.keys()))
 
-    months = seasons[season]
-    if county == 'Statewide':
-        sel = df[df['date'].dt.month.isin(months)]
-    else:
-        sel = df[(df['county'] == county) & (df['date'].dt.month.isin(months))]
+    #months = seasons[season]
+    #if county == 'Statewide':
+    #    sel = df[df['date'].dt.month.isin(months)]
+    #else:
+    #    sel = df[(df['county'] == county) & (df['date'].dt.month.isin(months))]
 
-    st.markdown(f"### Historical summary — {county} — {season}")
-    if sel.empty:
-        st.info('No historical records for this selection.')
-        return
+    #st.markdown(f"### Historical summary — {county} — {season}")
+    #if sel.empty:
+    #    st.info('No historical records for this selection.')
+    #    return
 
     # Compute simple hazard probabilities from labels
-    summary = {}
-    for h in ['fire_label','flood_label','wind_label','winter_label','seismic_label']:
-        if h in sel.columns:
-            summary[h.replace('_label','')] = float(sel[h].mean())
+    #summary = {}
+    #for h in ['fire_label','flood_label','wind_label','winter_label','seismic_label']:
+    #    if h in sel.columns:
+    #        summary[h.replace('_label','')] = float(sel[h].mean())
 
-    st.table(pd.DataFrame([summary]))
-    st.markdown('Use this view to compare seasonal baselines and assist planning for preparedness and mitigation.')
+    #st.table(pd.DataFrame([summary]))
+    #st.markdown('Use this view to compare seasonal baselines and assist planning for preparedness and mitigation.')
 
 
 # =============================================================================
