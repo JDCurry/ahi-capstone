@@ -3298,8 +3298,7 @@ def page_model_evaluation():
 
     st.markdown("""
     This page shows validation results for the deployed Hazard-LM model. 
-    **AUC** (Area Under Curve) measures how well the model discriminates between hazard/no-hazard. 
-    1.0 = perfect, 0.5 = random guessing, >0.8 = good.
+    **AUC** (Area Under Curve) reflects how well the model distinguishes between conditions that lead to hazard events versus those that do not.
     """)
 
     # Current model performance - hardcoded from evaluation results
