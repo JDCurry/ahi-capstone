@@ -2240,7 +2240,15 @@ def page_ai_predictions():
     # Allow operator to choose a short (14-day) or extended (30-day) forecast window
     forecast_choice = st.selectbox('Forecast horizon', ['14 days (recommended)', '30 days (extended)'], index=0, help='Shorter horizon preferred for reliability; extended window is available up to 30 days.')
     MAX_FORECAST_DAYS = 14 if '14' in forecast_choice else 30
-    today = datetime.now().date()
+    # Use PST timezone for consistent date display
+    try:
+        from zoneinfo import ZoneInfo
+        pst = ZoneInfo('America/Los_Angeles')
+        today = datetime.now(pst).date()
+    except Exception:
+        from datetime import timezone
+        pst = timezone(timedelta(hours=-8))
+        today = datetime.now(pst).date()
     max_forecast_date = today + timedelta(days=MAX_FORECAST_DAYS)
     
     # Explain forecast periods to users
