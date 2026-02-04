@@ -2048,7 +2048,12 @@ def page_mitigation_planning():
     
     st.markdown(f"### {selected_county} County Profile")
     
-    col1, col2, col3, col4 = st.columns(4)
+    # Get hazard-specific event count
+    hazard_event_col = f"{selected_hazard.lower()}_events" if selected_hazard != "Multi" else "total_events"
+    hazard_events = int(county_data.get(hazard_event_col, 0)) if hazard_event_col in county_data else int(county_data['total_events'])
+    hazard_label = f"{selected_hazard} Events" if selected_hazard != "Multi" else "Total Events"
+    
+    col1, col2, col3, col4, col5 = st.columns(5)
     with col1:
         st.metric("Population", f"{int(county_data['population']):,}")
     with col2:
@@ -2056,7 +2061,26 @@ def page_mitigation_planning():
     with col3:
         st.metric("SVI Score", f"{county_data['svi_score']:.2f}")
     with col4:
+        st.metric(hazard_label, hazard_events)
+    with col5:
         st.metric("Total Events", int(county_data['total_events']))
+    
+    # Explanatory expander for metrics
+    with st.expander("How are these metrics calculated?"):
+        st.markdown(f"""
+        **Risk Score**: A normalized score (0-100%) based on historical hazard event frequency. 
+        Calculated using a Gamma-Poisson Bayesian model that estimates annualized event rates 
+        across all hazard types, then normalized against the highest-risk county in the state.
+        
+        **{hazard_label}**: The number of recorded {selected_hazard.lower() if selected_hazard != 'Multi' else ''} hazard events 
+        for {selected_county} County in the historical dataset.
+        
+        **Total Events**: The combined count of all hazard events (fire, flood, wind, winter, seismic) 
+        recorded for this county.
+        
+        **SVI Score**: CDC Social Vulnerability Index (0-1 scale). Higher values indicate greater 
+        social vulnerability, meaning communities may need more support during disasters.
+        """)
     
     # Recommended actions
     st.markdown("### Recommended Mitigation Actions")
