@@ -3087,11 +3087,12 @@ def page_ai_predictions():
                 
                 # Show summary table
                 display_df = statewide_df.copy()
+                display_df = display_df.rename(columns={'county': 'County'})
                 for h in hazards:
                     col = f'{h}_p'
                     if col in display_df.columns:
                         display_df[h.title()] = (display_df[col] * 100).round(1).astype(str) + '%'
-                st.dataframe(display_df[['county'] + [h.title() for h in hazards]], use_container_width=True)
+                st.dataframe(display_df[['County'] + [h.title() for h in hazards]], use_container_width=True)
                 
                 # Download button
                 csv = statewide_df.to_csv(index=False)
@@ -3112,11 +3113,12 @@ def page_ai_predictions():
             # Show results table (persists after initial run)
             hazards = ['fire', 'flood', 'wind', 'winter', 'seismic']
             display_df = cached_df.copy()
+            display_df = display_df.rename(columns={'county': 'County'})
             for h in hazards:
                 col = f'{h}_p'
                 if col in display_df.columns:
                     display_df[h.title()] = (display_df[col] * 100).round(1).astype(str) + '%'
-            st.dataframe(display_df[['county'] + [h.title() for h in hazards]], use_container_width=True, hide_index=True)
+            st.dataframe(display_df[['County'] + [h.title() for h in hazards]], use_container_width=True, hide_index=True)
             
             # Download button
             csv = cached_df.to_csv(index=False)
