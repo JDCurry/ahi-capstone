@@ -2078,8 +2078,10 @@ def page_mitigation_planning():
         **Total Events**: The combined count of all hazard events (fire, flood, wind, winter, seismic) 
         recorded for this county.
         
-        **SVI Score**: CDC Social Vulnerability Index (0-1 scale). Higher values indicate greater 
-        social vulnerability, meaning communities may need more support during disasters.
+        **SVI Score**: The CDC/ATSDR Social Vulnerability Index (0-1 scale), a standardized measure 
+        incorporating socioeconomic factors, household composition, minority status, and housing/transportation 
+        access. Higher values indicate communities that may need more support during and after disasters. 
+        *Source: CDC/ATSDR*
         """)
     
     # Recommended actions
