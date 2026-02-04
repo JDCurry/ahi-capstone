@@ -2041,7 +2041,7 @@ def page_mitigation_planning():
         selected_county = st.selectbox("Select County", sorted(county_stats['county'].tolist()))
     
     with col2:
-        selected_hazard = st.selectbox("Primary Hazard", ["fire", "flood", "wind", "winter", "seismic", "multi"])
+        selected_hazard = st.selectbox("Primary Hazard", ["Fire", "Flood", "Wind", "Winter", "Seismic", "Multi"])
     
     # Get county data
     county_data = county_stats[county_stats['county'] == selected_county].iloc[0]
@@ -2063,7 +2063,7 @@ def page_mitigation_planning():
     
     actions = []
     for action_name, data in MITIGATION_ROI.items():
-        if data['hazard'] == selected_hazard or data['hazard'] == 'multi':
+        if data['hazard'] == selected_hazard.lower() or data['hazard'] == 'multi':
             mid_cost = sum(data['cost_range']) / 2
             expected_savings = mid_cost * data['roi']
             
