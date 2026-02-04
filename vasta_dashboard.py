@@ -3459,14 +3459,10 @@ def page_about():
     
     ### Source Code & Data
     
-    This project is deployed on Streamlit Cloud from the GitHub repository.
+    This project is deployed on Streamlit Cloud. Source code is available at: [github.com/JDCurry/ahi-capstone](https://github.com/JDCurry/ahi-capstone)
     
-    For questions or collaboration inquiries, please reach out through the SSRN paper contact information.
+    For questions or collaboration inquiries, please contact the project developer at: jcurry3428@smail.pcd.edu
     """)
-    
-    # Model status footer
-    st.markdown("---")
-    st.caption(f"Model: {MODEL_DISPLAY_NAME} | Device: {DEVICE} | Dashboard Version: 2.0")
 
 
 # =============================================================================
