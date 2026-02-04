@@ -3267,8 +3267,6 @@ def page_model_diagnostics():
     - Conduct softmax ablation study to quantify diffusion attention benefit
     """)
 
-    st.info("**Recommendation:** Prioritize expanding dataset coverage (more states/regions) and uncertainty quantification to make calibrated outputs operationally usable for emergency managers.")
-
     # Data sources section
     st.markdown("---")
     st.markdown("### Data Sources")
