@@ -3226,7 +3226,7 @@ def page_model_diagnostics():
         st.metric("Parameters", "15.8M")
     
     with col3:
-        status_text = "✅ Online" if model_ok else "❌ Offline"
+        status_text = "Online" if model_ok else "Offline"
         st.metric("Status", status_text)
     
     st.markdown("### Architecture")
