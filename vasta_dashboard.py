@@ -1023,9 +1023,9 @@ def render_sidebar():
         logo_path = Path(__file__).parent / 'logo-dark.png'
         try:
             if logo_path.exists():
-                col1, col2, col3 = st.columns([1, 2, 1])
+                col1, col2, col3 = st.columns([1, 3, 1])
                 with col2:
-                    st.image(str(logo_path), width=140)
+                    st.image(str(logo_path), width=180)
         except Exception:
             pass
         st.markdown(f"""
