@@ -2352,12 +2352,14 @@ def page_ai_predictions():
                 """, unsafe_allow_html=True)
             with col_info:
                 st.markdown(f"""
-                **Location**: {selected_county} County, Washington  
-                **Forecast Horizon**: {forecast_choice} (from {today.strftime('%b %d')})  
-                **Forecast End Date**: {max_forecast_date.strftime('%B %d, %Y')}  
-                **Data Source**: Hazard-LM v1.0 multi-hazard model  
-                **Season**: {current_month} — {_get_seasonal_note(today.month)}
-                """)
+                <div style="color: {COLORS['text_primary']}; font-size: 1.1em; line-height: 1.8;">
+                <strong>Location:</strong> {selected_county} County, Washington<br>
+                <strong>Forecast Horizon:</strong> {forecast_choice} (from {today.strftime('%b %d')})<br>
+                <strong>Forecast End Date:</strong> {max_forecast_date.strftime('%B %d, %Y')}<br>
+                <strong>Data Source:</strong> Hazard-LM v1.0 multi-hazard model<br>
+                <strong>Season:</strong> {current_month} — {_get_seasonal_note(today.month)}
+                </div>
+                """, unsafe_allow_html=True)
 
         # Quick synchronous prediction (live model) -- useful for interactive exploration
         try:
@@ -2428,7 +2430,7 @@ def page_ai_predictions():
                         pct = f"{p*100:.1f}%"
                         color = COLORS.get(h, COLORS['primary'])
                         with c:
-                            st.markdown(f"<div style='background:{COLORS['card_bg']}; padding:12px; border-radius:6px; text-align:center; margin-bottom:6px;'><div style='color:{color}; font-weight:700;'>{h.title()}</div><div style='font-size:20px; color:{COLORS['text_primary']}; font-weight:600;'>{pct}</div></div>", unsafe_allow_html=True)
+                            st.markdown(f"<div style='background:{COLORS['card_bg']}; padding:16px; border-radius:6px; text-align:center; margin-bottom:6px;'><div style='color:{color}; font-weight:700; font-size:1.1em;'>{h.title()}</div><div style='font-size:1.5em; color:{COLORS['text_primary']}; font-weight:600;'>{pct}</div></div>", unsafe_allow_html=True)
 
                     # end hazards row
                     st.markdown('### Model Summary (Risk)')
@@ -2480,7 +2482,7 @@ def page_ai_predictions():
                     }
                     
                     # Top hazards section
-                    st.markdown("**Top Hazards for This Period:**")
+                    st.markdown(f"<h3 style='color: {COLORS['text_primary']}; margin-bottom: 16px;'>Top Hazards for This Period</h3>", unsafe_allow_html=True)
                     for hazard, prob in sorted_risks[:3]:
                         level, interpretation = _interpret_risk(prob)
                         info = hazard_guidance.get(hazard, {'icon': '⚠️', 'action': 'Review standard protocols', 'resources': 'Local EOC'})
