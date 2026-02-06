@@ -2484,12 +2484,12 @@ def page_ai_predictions():
                     for hazard, prob in sorted_risks[:3]:
                         level, interpretation = _interpret_risk(prob)
                         info = hazard_guidance.get(hazard, {'icon': '⚠️', 'action': 'Review standard protocols', 'resources': 'Local EOC'})
+                        hazard_color = COLORS.get(hazard, COLORS['text_primary'])
                         st.markdown(f"""
-                        {info['icon']} **{hazard.title()}** — {prob*100:.1f}% ({level})  
-                        *{interpretation}*  
-                        **Suggested actions:** {info['action']}
-                        
-                        ---
+                        <h4 style="color: {hazard_color}; margin-bottom: 4px;">{info['icon']} {hazard.title()} — {prob*100:.1f}% ({level})</h4>
+                        <p style="color: {COLORS['text_primary']}; margin: 4px 0;"><em>{interpretation}</em></p>
+                        <p style="color: {COLORS['text_primary']}; margin: 4px 0;"><strong>Suggested actions:</strong> {info['action']}</p>
+                        <hr style="border-color: {COLORS['border']}; margin: 16px 0;">
                         """, unsafe_allow_html=True)
                     
                     # Interpretation guide
