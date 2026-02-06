@@ -1034,7 +1034,7 @@ def render_sidebar():
         </div>
         """, unsafe_allow_html=True)
         
-        st.markdown(f"<p style='color: {COLORS['text_tertiary']}; font-size: 11px; text-transform: uppercase; margin-top: 20px;'>Analytics Modules</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='color: {COLORS['text_tertiary']}; font-size: 14px; font-weight: 600; text-transform: uppercase; margin-top: 20px; letter-spacing: 0.5px;'>Analytics Modules</p>", unsafe_allow_html=True)
         
         if st.button("Executive Dashboard", use_container_width=True):
             st.session_state.page = 'dashboard'
@@ -1051,7 +1051,7 @@ def render_sidebar():
         if st.button("Mitigation Planning", use_container_width=True):
             st.session_state.page = 'mitigation'
         
-        st.markdown(f"<p style='color: {COLORS['text_tertiary']}; font-size: 11px; text-transform: uppercase; margin-top: 20px;'>AI Tools</p>", unsafe_allow_html=True)
+        st.markdown(f"<p style='color: {COLORS['text_tertiary']}; font-size: 14px; font-weight: 600; text-transform: uppercase; margin-top: 20px; letter-spacing: 0.5px;'>AI Tools</p>", unsafe_allow_html=True)
         
         if st.button("Quick Predict", use_container_width=True):
             st.session_state.page = 'ai_predict'
