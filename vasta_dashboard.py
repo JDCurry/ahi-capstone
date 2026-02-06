@@ -2434,7 +2434,7 @@ def page_ai_predictions():
                         pct = f"{p*100:.1f}%"
                         color = COLORS.get(h, COLORS['primary'])
                         with c:
-                            st.markdown(f"<div style='background:{COLORS['card_bg']}; padding:16px; border-radius:6px; text-align:center; margin-bottom:6px;'><div style='color:{color}; font-weight:700; font-size:1.1em;'>{h.title()}</div><div style='font-size:1.5em; color:{COLORS['text_primary']}; font-weight:600;'>{pct}</div></div>", unsafe_allow_html=True)
+                            st.markdown(f"<div style='background:{COLORS['card_bg']}; padding:16px; border-radius:6px; text-align:center; margin-bottom:6px;'><div style='color:{color}; font-weight:700; font-size:1.25em;'>{h.title()}</div><div style='font-size:1.5em; color:{COLORS['text_primary']}; font-weight:600;'>{pct}</div></div>", unsafe_allow_html=True)
 
                     # end hazards row
                     st.markdown('### Model Summary (Risk)')
@@ -3104,7 +3104,7 @@ def page_ai_predictions():
                     continue
             
             progress_bar.progress(1.0)
-            status_text.text('✅ Complete!')
+            status_text.text('Complete!')
             
             if all_rows:
                 statewide_df = pd.DataFrame(all_rows)
@@ -3351,11 +3351,11 @@ def page_model_evaluation():
     
     # Performance metrics table
     performance_data = [
-        {"Hazard": "🔥 Fire", "AUC": 0.89, "Quality": "Excellent", "Notes": "Strong weather signal from ERC, temperature, humidity"},
-        {"Hazard": "❄️ Winter", "AUC": 0.94, "Quality": "Excellent", "Notes": "Clear seasonal patterns, temperature-driven"},
-        {"Hazard": "💨 Wind", "AUC": 0.87, "Quality": "Good", "Notes": "Captures storm patterns from temporal features"},
-        {"Hazard": "🌊 Flood", "AUC": 0.83, "Quality": "Good", "Notes": "Precipitation and streamflow patterns"},
-        {"Hazard": "🌋 Seismic", "AUC": 0.77, "Quality": "Good", "Notes": "Historical patterns; earthquakes less predictable"},
+        {"Hazard": "Fire", "AUC": 0.89, "Quality": "Excellent", "Notes": "Strong weather signal from ERC, temperature, humidity"},
+        {"Hazard": "Winter", "AUC": 0.94, "Quality": "Excellent", "Notes": "Clear seasonal patterns, temperature-driven"},
+        {"Hazard": "Wind", "AUC": 0.87, "Quality": "Good", "Notes": "Captures storm patterns from temporal features"},
+        {"Hazard": "Flood", "AUC": 0.83, "Quality": "Good", "Notes": "Precipitation and streamflow patterns"},
+        {"Hazard": "Seismic", "AUC": 0.77, "Quality": "Good", "Notes": "Historical patterns; earthquakes less predictable"},
     ]
     
     st.dataframe(pd.DataFrame(performance_data), use_container_width=True, hide_index=True)
