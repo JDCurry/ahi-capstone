@@ -2525,7 +2525,7 @@ def page_ai_predictions():
                     if DECISION_AUDIT_AVAILABLE and sorted_risks:
                         with st.expander("Decision Audit (Evidentiary Basis)", expanded=False):
                             st.markdown("""
-                            **What is this?** The Decision Audit provides the evidentiary basis for 
+                            The Decision Audit provides the evidentiary basis for 
                             each risk prediction. Use this information to support defensible decisions 
                             and cite specific data sources in briefings.
                             """)
@@ -2562,14 +2562,6 @@ def page_ai_predictions():
                             | USGS Earthquakes | Seismic event catalog |
                             | FEMA | Disaster declarations |
                             """)
-                            
-                            st.markdown(f"""
-                            <p style="color: {COLORS['text_tertiary']}; font-size: 11px; margin-top: 12px;">
-                            Model: Hazard-LM v1.0 | Training: 370,000+ observations | 
-                            Validation: Held-out test set (37,039 samples) | 
-                            Calibration: Diffusion attention (Curry, 2025)
-                            </p>
-                            """, unsafe_allow_html=True)
                     
                     # Original LLM summary if available
                     try:

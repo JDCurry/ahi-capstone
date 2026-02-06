@@ -238,8 +238,6 @@ def render_decision_audit_html(audit: dict, colors: dict) -> str:
 
 *{audit['calibration_statement']}*
 
-<small>Data sources: {', '.join(list(audit['data_sources'].keys())[:4])} | Model: {model['name']}</small>
-
 ---
 """
     
