@@ -2264,7 +2264,7 @@ def page_ai_predictions():
     # --- Forecast horizon restriction ---
     from datetime import timedelta
     # Allow operator to choose a short (14-day) or extended (30-day) forecast window
-    forecast_choice = st.selectbox('Forecast horizon', ['14 days (recommended)', '30 days (extended)'], index=0, help='Shorter horizon preferred for reliability; extended window is available up to 30 days.')
+    forecast_choice = st.selectbox('Forecast horizon', ['14 days', '30 days (extended)'], index=0, help='Shorter horizon preferred for reliability; extended window is available up to 30 days.')
     MAX_FORECAST_DAYS = 14 if '14' in forecast_choice else 30
     # Use PST timezone for consistent date display
     try:
@@ -2282,7 +2282,7 @@ def page_ai_predictions():
     with st.expander(f"About forecast periods (viewing on {today.strftime('%B %d, %Y')})", expanded=False):
         st.markdown(f"""
         **Why 14 and 30 days?**
-        - **14-day forecasts** offer higher confidence because weather prediction accuracy decreases over time. This is our recommended window for operational planning.
+        - **14-day forecasts** offer higher confidence because weather prediction accuracy decreases over time.
         - **30-day forecasts** provide extended situational awareness but carry greater uncertainty. Use for strategic planning, not immediate action.
         
         **These forecasts start from today's date** ({today.strftime('%B %d, %Y')}). The model considers:
@@ -2354,7 +2354,7 @@ def page_ai_predictions():
                 st.markdown(f"""
                 <div style="color: {COLORS['text_primary']}; font-size: 1.1em; line-height: 1.8;">
                 <strong>Location:</strong> {selected_county} County, Washington<br>
-                <strong>Forecast Horizon:</strong> {forecast_choice} (from {today.strftime('%b %d')})<br>
+                <strong>Forecast Horizon:</strong> {MAX_FORECAST_DAYS} days (from {today.strftime('%B %d, %Y')})<br>
                 <strong>Forecast End Date:</strong> {max_forecast_date.strftime('%B %d, %Y')}<br>
                 <strong>Data Source:</strong> Hazard-LM v1.0 multi-hazard model<br>
                 <strong>Season:</strong> {current_month} — {_get_seasonal_note(today.month)}
@@ -2382,7 +2382,11 @@ def page_ai_predictions():
         # Centered Quick Predict button below the date selector
         b1, b2, b3 = st.columns([1,1,1])
         with b2:
-            if st.button('Quick Predict (Live Model)'):
+            st.markdown(f"<style>.big-predict-btn button {{font-size: 1.2em !important; padding: 0.75em 2em !important;}}</style>", unsafe_allow_html=True)
+            st.markdown('<div class="big-predict-btn">', unsafe_allow_html=True)
+            predict_clicked = st.button('Quick Predict (Live Model)')
+            st.markdown('</div>', unsafe_allow_html=True)
+            if predict_clicked:
                 try:
                     risks, summary = predict_and_summarize(selected_county, sel_date)
                     if risks is None:
@@ -2455,27 +2459,27 @@ def page_ai_predictions():
                     # Hazard-specific guidance
                     hazard_guidance = {
                         'fire': {
-                            'icon': '🔥',
+                            'icon': '',
                             'action': 'Review and communicate evacuation routes to vulnerable populations. Coordinate with local fire districts on resource availability. Assess defensible space near critical facilities and shelters. Verify water supply access points. Alert utility providers about potential shutoff needs.',
                             'resources': 'DNR Fire Prevention, local fire districts'
                         },
                         'flood': {
-                            'icon': '🌊',
+                            'icon': '',
                             'action': 'Inspect and clear drainage systems and culverts. Verify flood gauge monitoring is active. Pre-stage pumps, sandbags, and barriers at known flood-prone areas. Coordinate with public works on road closure plans. Alert downstream communities if applicable.',
                             'resources': 'NWS River Forecasts, USGS stream gauges'
                         },
                         'wind': {
-                            'icon': '💨',
+                            'icon': '',
                             'action': 'Coordinate with utilities on power line inspections and tree trimming. Secure outdoor equipment and signage. Pre-position generators at critical facilities. Review protocols for power outage response. Alert mobile home and manufactured housing communities.',
                             'resources': 'NWS High Wind Watches, utility outage maps'
                         },
                         'winter': {
-                            'icon': '❄️',
+                            'icon': '',
                             'action': 'Verify road treatment supplies and equipment readiness. Check backup power at designated warming shelters. Coordinate with WSDOT and local public works on plowing priorities. Prepare public messaging for travel advisories. Confirm heating assistance resources for vulnerable populations.',
                             'resources': 'NWS Winter Storm Watches, WSDOT road conditions'
                         },
                         'seismic': {
-                            'icon': '🌍',
+                            'icon': '',
                             'action': 'Review critical building structural assessments. Confirm communications redundancy (radio, satellite). Update ShakeAlert notification settings. Verify search and rescue equipment readiness. Review tsunami evacuation routes for coastal areas if applicable.',
                             'resources': 'PNSN earthquake monitoring, ShakeAlert'
                         }
@@ -2485,10 +2489,10 @@ def page_ai_predictions():
                     st.markdown(f"<h3 style='color: {COLORS['text_primary']}; margin-bottom: 16px;'>Top Hazards for This Period</h3>", unsafe_allow_html=True)
                     for hazard, prob in sorted_risks[:3]:
                         level, interpretation = _interpret_risk(prob)
-                        info = hazard_guidance.get(hazard, {'icon': '⚠️', 'action': 'Review standard protocols', 'resources': 'Local EOC'})
+                        info = hazard_guidance.get(hazard, {'icon': '', 'action': 'Review standard protocols', 'resources': 'Local EOC'})
                         hazard_color = COLORS.get(hazard, COLORS['text_primary'])
                         st.markdown(f"""
-                        <h4 style="color: {hazard_color}; margin-bottom: 4px;">{info['icon']} {hazard.title()} — {prob*100:.1f}% ({level})</h4>
+                        <h4 style="color: {hazard_color}; margin-bottom: 4px;">{hazard.title()} — {prob*100:.1f}% ({level})</h4>
                         <p style="color: {COLORS['text_primary']}; margin: 4px 0;"><em>{interpretation}</em></p>
                         <p style="color: {COLORS['text_primary']}; margin: 4px 0;"><strong>Suggested actions:</strong> {info['action']}</p>
                         <hr style="border-color: {COLORS['border']}; margin: 16px 0;">
