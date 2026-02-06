@@ -2411,7 +2411,7 @@ def page_ai_predictions():
                             'summary': summary,
                             'mistral_summary': mistral_summary
                         }
-                        st.success('Prediction stored — results shown below.')
+                        # st.success('Prediction stored — results shown below.')
                 except Exception as e:
                     st.error(f'Quick prediction failed: {e}')
 
@@ -2454,41 +2454,43 @@ def page_ai_predictions():
                     hazard_guidance = {
                         'fire': {
                             'icon': '🔥',
-                            'action': 'Review evacuation routes, coordinate with fire districts, assess defensible space near critical facilities',
+                            'action': 'Review and communicate evacuation routes to vulnerable populations. Coordinate with local fire districts on resource availability. Assess defensible space near critical facilities and shelters. Verify water supply access points. Alert utility providers about potential shutoff needs.',
                             'resources': 'DNR Fire Prevention, local fire districts'
                         },
                         'flood': {
                             'icon': '🌊',
-                            'action': 'Check drainage systems, verify flood gauges, pre-stage pumps and sandbags',
+                            'action': 'Inspect and clear drainage systems and culverts. Verify flood gauge monitoring is active. Pre-stage pumps, sandbags, and barriers at known flood-prone areas. Coordinate with public works on road closure plans. Alert downstream communities if applicable.',
                             'resources': 'NWS River Forecasts, USGS stream gauges'
                         },
                         'wind': {
                             'icon': '💨',
-                            'action': 'Coordinate with utilities on power line inspections, secure outdoor equipment',
+                            'action': 'Coordinate with utilities on power line inspections and tree trimming. Secure outdoor equipment and signage. Pre-position generators at critical facilities. Review protocols for power outage response. Alert mobile home and manufactured housing communities.',
                             'resources': 'NWS High Wind Watches, utility outage maps'
                         },
                         'winter': {
                             'icon': '❄️',
-                            'action': 'Verify road treatment supplies, check backup power at shelters, coordinate with WSDOT',
+                            'action': 'Verify road treatment supplies and equipment readiness. Check backup power at designated warming shelters. Coordinate with WSDOT and local public works on plowing priorities. Prepare public messaging for travel advisories. Confirm heating assistance resources for vulnerable populations.',
                             'resources': 'NWS Winter Storm Watches, WSDOT road conditions'
                         },
                         'seismic': {
                             'icon': '🌍',
-                            'action': 'Review building assessments, confirm communications redundancy, update ShakeAlert settings',
+                            'action': 'Review critical building structural assessments. Confirm communications redundancy (radio, satellite). Update ShakeAlert notification settings. Verify search and rescue equipment readiness. Review tsunami evacuation routes for coastal areas if applicable.',
                             'resources': 'PNSN earthquake monitoring, ShakeAlert'
                         }
                     }
                     
                     # Top hazards section
                     st.markdown("**Top Hazards for This Period:**")
-                    for hazard, prob in sorted_risks[:2]:
+                    for hazard, prob in sorted_risks[:3]:
                         level, interpretation = _interpret_risk(prob)
                         info = hazard_guidance.get(hazard, {'icon': '⚠️', 'action': 'Review standard protocols', 'resources': 'Local EOC'})
                         st.markdown(f"""
-                        - {info['icon']} **{hazard.title()}** — {prob*100:.1f}% ({level})  
-                          *{interpretation}*  
-                          **Suggested action:** {info['action']}
-                        """)
+                        {info['icon']} **{hazard.title()}** — {prob*100:.1f}% ({level})  
+                        *{interpretation}*  
+                        **Suggested actions:** {info['action']}
+                        
+                        ---
+                        """, unsafe_allow_html=True)
                     
                     # Interpretation guide
                     with st.expander("How to interpret these numbers", expanded=False):
@@ -2522,8 +2524,8 @@ def page_ai_predictions():
                             and cite specific data sources in briefings.
                             """)
                             
-                            # Build audit for top 2 hazards
-                            for hazard, prob in sorted_risks[:2]:
+                            # Build audit for top 3 hazards
+                            for hazard, prob in sorted_risks[:3]:
                                 try:
                                     audit = build_decision_audit(
                                         county=selected_county,
