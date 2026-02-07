@@ -2264,7 +2264,7 @@ def page_ai_predictions():
     # --- Forecast horizon restriction ---
     from datetime import timedelta
     # Allow operator to choose a short (14-day) or extended (30-day) forecast window
-    forecast_choice = st.selectbox('Forecast horizon', ['14 days', '30 days (extended)'], index=0, help='Shorter horizon preferred for reliability; extended window is available up to 30 days.')
+    forecast_choice = st.selectbox('Forecast Horizon', ['14 days', '30 days (extended)'], index=0, help='Shorter horizon preferred for reliability; extended window is available up to 30 days.')
     MAX_FORECAST_DAYS = 14 if '14' in forecast_choice else 30
     # Use PST timezone for consistent date display
     try:
@@ -2297,7 +2297,7 @@ def page_ai_predictions():
     if len(county_df) > 0:
         latest = county_df.iloc[0]
 
-        st.markdown(f"### Current Conditions - {selected_county}")
+        st.markdown(f"### Selected County: {selected_county}")
 
         # County satellite image for visual context
         def _get_county_image(county_name: str):
