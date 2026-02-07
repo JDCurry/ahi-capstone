@@ -2277,6 +2277,13 @@ def page_ai_predictions():
         today = datetime.now(pst).date()
     max_forecast_date = today + timedelta(days=MAX_FORECAST_DAYS)
     
+    # Compute empirical horizon-aware probabilities BEFORE they're used
+    # This ensures 14-day and 30-day forecasts actually differ
+    try:
+        emp_map = compute_empirical_horizon_probs(df, horizon_days=MAX_FORECAST_DAYS, alpha=20)
+    except Exception:
+        emp_map = None
+    
     # Explain forecast periods to users
     current_month = today.strftime('%B')
     with st.expander(f"About forecast periods (viewing on {today.strftime('%B %d, %Y')})", expanded=False):
@@ -2410,10 +2417,28 @@ def page_ai_predictions():
                         except Exception:
                             mistral_summary = None
 
+                        # Blend model predictions with empirical horizon probabilities
+                        # This makes 14-day vs 30-day forecasts actually differ
+                        blended_risks = risks.copy()
+                        if emp_map is not None and selected_county in emp_map:
+                            county_emp = emp_map.get(selected_county, {})
+                            hazard_label_map = {
+                                'fire': 'fire_label', 'flood': 'flood_label',
+                                'wind': 'wind_label', 'winter': 'winter_label',
+                                'seismic': 'seismic_label'
+                            }
+                            for h, label in hazard_label_map.items():
+                                if h in blended_risks and label in county_emp:
+                                    emp_prob = county_emp[label].get('p_hat', 0.0)
+                                    model_prob = blended_risks[h]
+                                    # Weighted blend: 60% empirical (horizon-aware), 40% model
+                                    blended_risks[h] = 0.6 * emp_prob + 0.4 * model_prob
+                        
                         st.session_state['last_quick_prediction'] = {
                             'county': selected_county,
                             'date': str(sel_date),
-                            'risks': risks,
+                            'risks': blended_risks,
+                            'horizon_days': MAX_FORECAST_DAYS,
                             'summary': summary,
                             'mistral_summary': mistral_summary
                         }
@@ -2424,7 +2449,9 @@ def page_ai_predictions():
         # Render stored results immediately under the date control (centered)
         if 'last_quick_prediction' in st.session_state:
             last = st.session_state['last_quick_prediction']
-            if last.get('county') == selected_county and last.get('date') == str(sel_date):
+            # Check if results match current county AND horizon (not just county/date)
+            stored_horizon = last.get('horizon_days', 14)
+            if last.get('county') == selected_county and stored_horizon == MAX_FORECAST_DAYS:
                 mid1, mid2, mid3 = st.columns([1,2,1])
                 with mid2:
                     hazard_order = ['fire','flood','wind','winter','seismic']
