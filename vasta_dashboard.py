@@ -999,11 +999,7 @@ def render_header():
     except Exception:
         pass
 
-    # Small provenance/footer: model lineage
-    try:
-        st.markdown(f"<div style='color:{COLORS['text_tertiary']}; font-size:11px; margin-top:6px;'>Powered by <strong>Hazard-LM</strong> — model: {MODEL_DISPLAY_NAME}</div>", unsafe_allow_html=True)
-    except Exception:
-        pass
+    # Small provenance/footer: model lineage (removed by user request)
 
     # Show loaded dataset path and row count for debugging
     try:
