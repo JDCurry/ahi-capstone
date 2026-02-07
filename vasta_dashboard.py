@@ -802,8 +802,8 @@ def compute_county_stats(_df):
     return stats
 
 
-@st.cache_data(show_spinner=False)
-def compute_empirical_horizon_probs(_df, horizon_days: int = 14, alpha: int = 20):
+@st.cache_data
+def compute_empirical_horizon_probs(df, horizon_days: int = 14, alpha: int = 20):
     """Compute empirical per-county horizon probabilities for each hazard label.
 
     Returns a mapping: { county: { hazard: {'p_emp':..., 'n':..., 'p_hat':...}, ... }, '__state__': {...} }
@@ -814,37 +814,18 @@ def compute_empirical_horizon_probs(_df, horizon_days: int = 14, alpha: int = 20
 
     We apply simple shrinkage toward the state-level empirical probability using weight `alpha`:
         p_hat = (n * p_emp + alpha * p_state) / (n + alpha)
-    
-    NOTE: Uses _df (underscore prefix) to tell Streamlit not to hash the dataframe,
-    which speeds up caching significantly.
     """
     hazards = ['fire_label', 'flood_label', 'wind_label', 'winter_label', 'seismic_label']
     out = {}
     state_counts = {h: 0 for h in hazards}
     state_anchors = 0
-    df = _df  # Use the passed dataframe
-    
-    # OPTIMIZATION: Sample anchors instead of using all dates (much faster)
-    # For large datasets, checking every anchor is expensive. Sample ~100 anchors per county.
-    MAX_ANCHORS_PER_COUNTY = 100
 
     # group by county
     for county, g in df.groupby('county'):
-        g = g.sort_values('date')
-        dates = g['date'].values
-        max_date = g['date'].max()
-        
+        dates = sorted(g['date'].unique())
         # identify anchors that have horizon_days of future coverage
-        cutoff = max_date - pd.Timedelta(days=horizon_days)
-        anchor_mask = g['date'] <= cutoff
-        anchor_dates = g.loc[anchor_mask, 'date'].values
-        
-        # Sample if too many anchors
-        if len(anchor_dates) > MAX_ANCHORS_PER_COUNTY:
-            step = len(anchor_dates) // MAX_ANCHORS_PER_COUNTY
-            anchor_dates = anchor_dates[::step][:MAX_ANCHORS_PER_COUNTY]
-        
-        n = len(anchor_dates)
+        anchors = [d for d in dates if g['date'].max() >= (d + pd.Timedelta(days=horizon_days))]
+        n = len(anchors)
         rec = {}
         if n == 0:
             # leave empty for now; will fill with state-level later
@@ -853,22 +834,15 @@ def compute_empirical_horizon_probs(_df, horizon_days: int = 14, alpha: int = 20
             out[county] = rec
             continue
 
-        # OPTIMIZATION: Vectorized occurrence check using merge_asof or boolean indexing
-        # Pre-sort once for faster lookups
-        g_sorted = g.set_index('date').sort_index()
-        
+        # compute occurrences per hazard across anchors
         for h in hazards:
             occ = 0
-            h_series = g_sorted.get(h, pd.Series([], dtype=float))
-            for d in anchor_dates:
+            for d in anchors:
                 t0 = pd.Timestamp(d)
                 t1 = t0 + pd.Timedelta(days=horizon_days)
-                try:
-                    sub = h_series.loc[t0:t1]
-                    if len(sub) > 0 and (sub > 0).any():
-                        occ += 1
-                except Exception:
-                    pass
+                sub = g[(g['date'] > t0) & (g['date'] <= t1)]
+                if (sub.get(h, pd.Series([])) > 0).any():
+                    occ += 1
             p_emp = occ / n if n > 0 else 0.0
             rec[h] = {'p_emp': float(p_emp), 'n': int(n), 'p_hat': float(p_emp)}
             state_counts[h] += occ
@@ -897,22 +871,6 @@ def compute_empirical_horizon_probs(_df, horizon_days: int = 14, alpha: int = 20
 
     out['__state__'] = state_probs
     return out
-
-
-@st.cache_data(show_spinner="Loading horizon probabilities...")
-def get_precomputed_horizon_maps(_df):
-    """Precompute horizon probability maps for both 14 and 30 days.
-    
-    This runs once at startup and caches both maps, so switching
-    between horizons is instant.
-    """
-    maps = {}
-    for horizon in [14, 30]:
-        try:
-            maps[horizon] = compute_empirical_horizon_probs(_df, horizon_days=horizon, alpha=20)
-        except Exception:
-            maps[horizon] = None
-    return maps
 
 
 def get_plotly_theme():
@@ -2319,14 +2277,6 @@ def page_ai_predictions():
         today = datetime.now(pst).date()
     max_forecast_date = today + timedelta(days=MAX_FORECAST_DAYS)
     
-    # Load precomputed horizon maps (computed once at startup, cached)
-    # This makes switching between 14/30 days instant
-    try:
-        horizon_maps = get_precomputed_horizon_maps(df)
-        emp_map = horizon_maps.get(MAX_FORECAST_DAYS)
-    except Exception:
-        emp_map = None
-    
     # Explain forecast periods to users
     current_month = today.strftime('%B')
     with st.expander(f"About forecast periods (viewing on {today.strftime('%B %d, %Y')})", expanded=False):
@@ -2344,16 +2294,8 @@ def page_ai_predictions():
         Running this same forecast in a different month would show different risk profiles based on seasonal factors.
         """)
 
-
     if len(county_df) > 0:
-        # Select the most recent row whose date is at least MAX_FORECAST_DAYS before today
-        horizon_cutoff = today - timedelta(days=MAX_FORECAST_DAYS)
-        # Convert horizon_cutoff to pandas Timestamp for comparison
-        eligible_rows = county_df[county_df['date'] <= pd.Timestamp(horizon_cutoff)]
-        if len(eligible_rows) > 0:
-            latest = eligible_rows.iloc[-1]
-        else:
-            latest = county_df.iloc[-1]  # fallback to most recent if none match
+        latest = county_df.iloc[0]
 
         st.markdown(f"### Selected County: {selected_county}")
 
@@ -2374,7 +2316,7 @@ def page_ai_predictions():
                 if clean_name in p.stem.upper():
                     return p
             return None
-
+        
         def _get_image_base64(img_path):
             """Convert image to base64 for inline HTML display."""
             import base64
@@ -2383,7 +2325,7 @@ def page_ai_predictions():
                     return base64.b64encode(f.read()).decode('utf-8')
             except Exception:
                 return ''
-
+        
         def _get_seasonal_note(month: int) -> str:
             """Return seasonal hazard context based on month."""
             if month in [12, 1, 2]:
@@ -2395,7 +2337,7 @@ def page_ai_predictions():
             elif month in [9, 10, 11]:
                 return "Fire season waning, winter storms emerging"
             return "Typical conditions"
-
+        
         county_img_path = _get_county_image(selected_county)
         if county_img_path:
             col_img, col_info = st.columns([1, 2])
@@ -2468,28 +2410,10 @@ def page_ai_predictions():
                         except Exception:
                             mistral_summary = None
 
-                        # Blend model predictions with empirical horizon probabilities
-                        # This makes 14-day vs 30-day forecasts actually differ
-                        blended_risks = risks.copy()
-                        if emp_map is not None and selected_county in emp_map:
-                            county_emp = emp_map.get(selected_county, {})
-                            hazard_label_map = {
-                                'fire': 'fire_label', 'flood': 'flood_label',
-                                'wind': 'wind_label', 'winter': 'winter_label',
-                                'seismic': 'seismic_label'
-                            }
-                            for h, label in hazard_label_map.items():
-                                if h in blended_risks and label in county_emp:
-                                    emp_prob = county_emp[label].get('p_hat', 0.0)
-                                    model_prob = blended_risks[h]
-                                    # Weighted blend: 60% empirical (horizon-aware), 40% model
-                                    blended_risks[h] = 0.6 * emp_prob + 0.4 * model_prob
-                        
                         st.session_state['last_quick_prediction'] = {
                             'county': selected_county,
                             'date': str(sel_date),
-                            'risks': blended_risks,
-                            'horizon_days': MAX_FORECAST_DAYS,
+                            'risks': risks,
                             'summary': summary,
                             'mistral_summary': mistral_summary
                         }
@@ -2500,9 +2424,7 @@ def page_ai_predictions():
         # Render stored results immediately under the date control (centered)
         if 'last_quick_prediction' in st.session_state:
             last = st.session_state['last_quick_prediction']
-            # Check if results match current county AND horizon (not just county/date)
-            stored_horizon = last.get('horizon_days', 14)
-            if last.get('county') == selected_county and stored_horizon == MAX_FORECAST_DAYS:
+            if last.get('county') == selected_county and last.get('date') == str(sel_date):
                 mid1, mid2, mid3 = st.columns([1,2,1])
                 with mid2:
                     hazard_order = ['fire','flood','wind','winter','seismic']
