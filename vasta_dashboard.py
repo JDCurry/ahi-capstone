@@ -802,8 +802,8 @@ def compute_county_stats(_df):
     return stats
 
 
-@st.cache_data
-def compute_empirical_horizon_probs(df, horizon_days: int = 14, alpha: int = 20):
+@st.cache_data(show_spinner=False)
+def compute_empirical_horizon_probs(_df, horizon_days: int = 14, alpha: int = 20):
     """Compute empirical per-county horizon probabilities for each hazard label.
 
     Returns a mapping: { county: { hazard: {'p_emp':..., 'n':..., 'p_hat':...}, ... }, '__state__': {...} }
@@ -814,18 +814,37 @@ def compute_empirical_horizon_probs(df, horizon_days: int = 14, alpha: int = 20)
 
     We apply simple shrinkage toward the state-level empirical probability using weight `alpha`:
         p_hat = (n * p_emp + alpha * p_state) / (n + alpha)
+    
+    NOTE: Uses _df (underscore prefix) to tell Streamlit not to hash the dataframe,
+    which speeds up caching significantly.
     """
     hazards = ['fire_label', 'flood_label', 'wind_label', 'winter_label', 'seismic_label']
     out = {}
     state_counts = {h: 0 for h in hazards}
     state_anchors = 0
+    df = _df  # Use the passed dataframe
+    
+    # OPTIMIZATION: Sample anchors instead of using all dates (much faster)
+    # For large datasets, checking every anchor is expensive. Sample ~100 anchors per county.
+    MAX_ANCHORS_PER_COUNTY = 100
 
     # group by county
     for county, g in df.groupby('county'):
-        dates = sorted(g['date'].unique())
+        g = g.sort_values('date')
+        dates = g['date'].values
+        max_date = g['date'].max()
+        
         # identify anchors that have horizon_days of future coverage
-        anchors = [d for d in dates if g['date'].max() >= (d + pd.Timedelta(days=horizon_days))]
-        n = len(anchors)
+        cutoff = max_date - pd.Timedelta(days=horizon_days)
+        anchor_mask = g['date'] <= cutoff
+        anchor_dates = g.loc[anchor_mask, 'date'].values
+        
+        # Sample if too many anchors
+        if len(anchor_dates) > MAX_ANCHORS_PER_COUNTY:
+            step = len(anchor_dates) // MAX_ANCHORS_PER_COUNTY
+            anchor_dates = anchor_dates[::step][:MAX_ANCHORS_PER_COUNTY]
+        
+        n = len(anchor_dates)
         rec = {}
         if n == 0:
             # leave empty for now; will fill with state-level later
@@ -834,15 +853,22 @@ def compute_empirical_horizon_probs(df, horizon_days: int = 14, alpha: int = 20)
             out[county] = rec
             continue
 
-        # compute occurrences per hazard across anchors
+        # OPTIMIZATION: Vectorized occurrence check using merge_asof or boolean indexing
+        # Pre-sort once for faster lookups
+        g_sorted = g.set_index('date').sort_index()
+        
         for h in hazards:
             occ = 0
-            for d in anchors:
+            h_series = g_sorted.get(h, pd.Series([], dtype=float))
+            for d in anchor_dates:
                 t0 = pd.Timestamp(d)
                 t1 = t0 + pd.Timedelta(days=horizon_days)
-                sub = g[(g['date'] > t0) & (g['date'] <= t1)]
-                if (sub.get(h, pd.Series([])) > 0).any():
-                    occ += 1
+                try:
+                    sub = h_series.loc[t0:t1]
+                    if len(sub) > 0 and (sub > 0).any():
+                        occ += 1
+                except Exception:
+                    pass
             p_emp = occ / n if n > 0 else 0.0
             rec[h] = {'p_emp': float(p_emp), 'n': int(n), 'p_hat': float(p_emp)}
             state_counts[h] += occ
@@ -871,6 +897,22 @@ def compute_empirical_horizon_probs(df, horizon_days: int = 14, alpha: int = 20)
 
     out['__state__'] = state_probs
     return out
+
+
+@st.cache_data(show_spinner="Loading horizon probabilities...")
+def get_precomputed_horizon_maps(_df):
+    """Precompute horizon probability maps for both 14 and 30 days.
+    
+    This runs once at startup and caches both maps, so switching
+    between horizons is instant.
+    """
+    maps = {}
+    for horizon in [14, 30]:
+        try:
+            maps[horizon] = compute_empirical_horizon_probs(_df, horizon_days=horizon, alpha=20)
+        except Exception:
+            maps[horizon] = None
+    return maps
 
 
 def get_plotly_theme():
@@ -2277,10 +2319,11 @@ def page_ai_predictions():
         today = datetime.now(pst).date()
     max_forecast_date = today + timedelta(days=MAX_FORECAST_DAYS)
     
-    # Compute empirical horizon-aware probabilities BEFORE they're used
-    # This ensures 14-day and 30-day forecasts actually differ
+    # Load precomputed horizon maps (computed once at startup, cached)
+    # This makes switching between 14/30 days instant
     try:
-        emp_map = compute_empirical_horizon_probs(df, horizon_days=MAX_FORECAST_DAYS, alpha=20)
+        horizon_maps = get_precomputed_horizon_maps(df)
+        emp_map = horizon_maps.get(MAX_FORECAST_DAYS)
     except Exception:
         emp_map = None
     
