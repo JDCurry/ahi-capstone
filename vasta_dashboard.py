@@ -2344,8 +2344,15 @@ def page_ai_predictions():
         Running this same forecast in a different month would show different risk profiles based on seasonal factors.
         """)
 
+
     if len(county_df) > 0:
-        latest = county_df.iloc[0]
+        # Select the most recent row whose date is at least MAX_FORECAST_DAYS before today
+        horizon_cutoff = today - timedelta(days=MAX_FORECAST_DAYS)
+        eligible_rows = county_df[county_df['date'] <= horizon_cutoff]
+        if len(eligible_rows) > 0:
+            latest = eligible_rows.iloc[-1]
+        else:
+            latest = county_df.iloc[-1]  # fallback to most recent if none match
 
         st.markdown(f"### Selected County: {selected_county}")
 
@@ -2366,7 +2373,7 @@ def page_ai_predictions():
                 if clean_name in p.stem.upper():
                     return p
             return None
-        
+
         def _get_image_base64(img_path):
             """Convert image to base64 for inline HTML display."""
             import base64
@@ -2375,7 +2382,7 @@ def page_ai_predictions():
                     return base64.b64encode(f.read()).decode('utf-8')
             except Exception:
                 return ''
-        
+
         def _get_seasonal_note(month: int) -> str:
             """Return seasonal hazard context based on month."""
             if month in [12, 1, 2]:
@@ -2387,7 +2394,7 @@ def page_ai_predictions():
             elif month in [9, 10, 11]:
                 return "Fire season waning, winter storms emerging"
             return "Typical conditions"
-        
+
         county_img_path = _get_county_image(selected_county)
         if county_img_path:
             col_img, col_info = st.columns([1, 2])
