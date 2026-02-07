@@ -2348,7 +2348,8 @@ def page_ai_predictions():
     if len(county_df) > 0:
         # Select the most recent row whose date is at least MAX_FORECAST_DAYS before today
         horizon_cutoff = today - timedelta(days=MAX_FORECAST_DAYS)
-        eligible_rows = county_df[county_df['date'] <= horizon_cutoff]
+        # Convert horizon_cutoff to pandas Timestamp for comparison
+        eligible_rows = county_df[county_df['date'] <= pd.Timestamp(horizon_cutoff)]
         if len(eligible_rows) > 0:
             latest = eligible_rows.iloc[-1]
         else:
