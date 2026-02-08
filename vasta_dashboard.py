@@ -3367,30 +3367,32 @@ def page_model_evaluation():
 
     # Calibration section
     st.markdown("---")
-    st.markdown("### Calibration Analysis")
-    st.markdown("""
-    **Calibration** means the predicted probabilities match real-world frequencies. 
-    If the model says 30% fire risk, fires should occur ~30% of the time in those conditions.
-    
-    Temperature scaling was applied to improve calibration (reduces overconfidence):
-    """)
-    
-    calibration_data = [
-        {"Hazard": "Fire", "Temperature": 1.735, "ECE Before": "12.6%", "ECE After": "5.2%", "Improvement": "59% better"},
-        {"Hazard": "Flood", "Temperature": 1.259, "ECE Before": "0.8%", "ECE After": "1.4%", "Improvement": "Already calibrated"},
-        {"Hazard": "Wind", "Temperature": 1.0, "ECE Before": "3.9%", "ECE After": "3.9%", "Improvement": "No scaling needed"},
-        {"Hazard": "Winter", "Temperature": 1.0, "ECE Before": "5.4%", "ECE After": "5.4%", "Improvement": "No scaling needed"},
-        {"Hazard": "Seismic", "Temperature": 0.835, "ECE Before": "2.0%", "ECE After": "0.9%", "Improvement": "55% better"},
-    ]
-    st.dataframe(pd.DataFrame(calibration_data), use_container_width=True, hide_index=True)
-    st.caption("ECE = Expected Calibration Error. Lower is better. <5% is considered well-calibrated.")
 
-    # Show reliability diagram if available
-    reliability_img = Path("figures/figure_reliability_multi_panel.png")
-    if reliability_img.exists():
-        st.markdown("**Reliability Diagrams**")
-        st.image(str(reliability_img), use_container_width=True)
-        st.caption("Blue = before temperature scaling, Orange = after. Diagonal line = perfect calibration.")
+    # Calibration Analysis section commented out: No calibration was applied to the deployed model.
+    # st.markdown("### Calibration Analysis")
+    # st.markdown("""
+    # **Calibration** means the predicted probabilities match real-world frequencies. 
+    # If the model says 30% fire risk, fires should occur ~30% of the time in those conditions.
+    # 
+    # Temperature scaling was applied to improve calibration (reduces overconfidence):
+    # """)
+    # 
+    # calibration_data = [
+    #     {"Hazard": "Fire", "Temperature": 1.735, "ECE Before": "12.6%", "ECE After": "5.2%", "Improvement": "59% better"},
+    #     {"Hazard": "Flood", "Temperature": 1.259, "ECE Before": "0.8%", "ECE After": "1.4%", "Improvement": "Already calibrated"},
+    #     {"Hazard": "Wind", "Temperature": 1.0, "ECE Before": "3.9%", "ECE After": "3.9%", "Improvement": "No scaling needed"},
+    #     {"Hazard": "Winter", "Temperature": 1.0, "ECE Before": "5.4%", "ECE After": "5.4%", "Improvement": "No scaling needed"},
+    #     {"Hazard": "Seismic", "Temperature": 0.835, "ECE Before": "2.0%", "ECE After": "0.9%", "Improvement": "55% better"},
+    # ]
+    # st.dataframe(pd.DataFrame(calibration_data), use_container_width=True, hide_index=True)
+    # st.caption("ECE = Expected Calibration Error. Lower is better. <5% is considered well-calibrated.")
+    #
+    # # Show reliability diagram if available
+    # reliability_img = Path("figures/figure_reliability_multi_panel.png")
+    # if reliability_img.exists():
+    #     st.markdown("**Reliability Diagrams**")
+    #     st.image(str(reliability_img), use_container_width=True)
+    #     st.caption("Blue = before temperature scaling, Orange = after. Diagonal line = perfect calibration.")
 
     # User guide section
     st.markdown("---")
