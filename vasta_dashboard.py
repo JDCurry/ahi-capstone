@@ -191,8 +191,7 @@ def download_model_if_needed():
 
 # Resolved model path
 RESOLVED_MODEL_PATH = get_model_path() or MODEL_PATH_LOCAL
-# Prefer canonical WA parquet by default (falls back inside loader if missing)
-DATA_PATH = Path("data/wa_gridmet/wa_hazard_dataset.parquet/wa_hazard_dataset.parquet")
+DATA_PATH = Path("data/WA_Climate_Fire_Dashboard_Data.parquet")
 DUCKDB_PATH = Path("data/hazard_lm_warehouse.duckdb")
 LOADED_DATA_PATH = None
 LOADED_DATA_ROWS = 0
