@@ -822,8 +822,9 @@ def compute_empirical_horizon_probs(df, horizon_days: int = 14, alpha: int = 20)
     # group by county
     for county, g in df.groupby('county'):
         dates = sorted(g['date'].unique())
-        # identify anchors that have horizon_days of future coverage
-        anchors = [d for d in dates if g['date'].max() >= (d + pd.Timedelta(days=horizon_days))]
+        # Only use anchors where d + horizon_days is within the available date range
+        max_date = max(dates)
+        anchors = [d for d in dates if d + pd.Timedelta(days=horizon_days) <= max_date]
         n = len(anchors)
         rec = {}
         if n == 0:
