@@ -5,6 +5,7 @@ NO training dependencies - pure PyTorch inference only.
 Calibration pipeline (applied in order):
   1. Temperature scaling  - per-hazard T fitted on validation set (NLL optimization)
   2. Seasonal prior       - physics-informed logit bias by month (WA climatology)
+  3. Base-rate ceiling     - caps max probability at historical plausibility limits
 
 Updated for HazardLMDiffusion model API:
   model(static_cont, temporal, region_ids, state_ids, nlcd_ids)
@@ -99,6 +100,26 @@ SEASONAL_LOGIT_BIAS = {
     'seismic': {m: 0.0 for m in range(1, 13)},
 }
 
+# --- Base-rate ceiling: maximum plausible daily probability per hazard ---
+# Derived from WA clean label base rates in the training data.
+# These represent the upper bound of what a single-day probability should be.
+# Even during peak season, no county should exceed these on a daily basis.
+#
+# Training data base rates (3-day label window):
+#   fire ~1.1%, flood ~0.9%, wind ~2.8%, winter ~4.3%, seismic ~3.0%
+#
+# Ceilings are set relative to model reliability:
+# - Well-calibrated heads (fire AUC 0.73, winter AUC 0.74) get generous ceilings
+# - Weak heads (wind AUC 0.58, seismic AUC 0.50) get tighter ceilings since the
+#   model can't discriminate well and overconfident predictions are meaningless
+BASE_RATE_CEILING = {
+    'fire':    0.35,  # 35% max - well-calibrated head, generous ceiling
+    'flood':   0.25,  # 25% max - moderate head (AUC 0.65)
+    'wind':    0.15,  # 15% max - weak head (AUC 0.58), can't trust high values
+    'winter':  0.35,  # 35% max - best head (AUC 0.74), generous ceiling
+    'seismic': 0.08,  # 8% max  - near-random head (AUC 0.50), tight ceiling
+}
+
 
 def load_temperature_scales(path: Optional[str] = None) -> Dict[str, float]:
     """Load per-hazard temperature scales from JSON file.
@@ -155,6 +176,7 @@ def _apply_calibration(
       1. Temperature scaling:  logit_scaled = raw_logit / T
       2. Seasonal prior:       logit_final  = logit_scaled + seasonal_bias(month)
       3. Sigmoid:              prob = 1 / (1 + exp(-logit_final))
+      4. Base-rate ceiling:    prob = min(prob, ceiling[hazard])
 
     Args:
         raw_logit: Raw logit from the model
@@ -169,9 +191,28 @@ def _apply_calibration(
         temperatures = load_temperature_scales()
 
     # Step 1: Temperature scaling
+    # NOTE: T < 1 sharpens predictions (makes them more extreme).
+    # For hazards where the model is near-random (AUC < 0.65), sharpening
+    # makes overconfident predictions worse. Clamp T >= 1.0 for those.
     T = temperatures.get(hazard, 1.0)
     T = max(T, 0.01)  # Guard against division by zero
+    # For poorly-performing heads, don't let T<1 amplify bad predictions
+    WEAK_HEADS = {'wind', 'seismic'}  # AUC < 0.65 on test set
+    if hazard in WEAK_HEADS:
+        T = max(T, 1.0)  # Only soften, never sharpen
     scaled_logit = raw_logit / T
+
+    # Step 1b: Base-rate recalibration bias for weak heads
+    # The wind and seismic heads are near-random (AUC ~0.50-0.58) and
+    # systematically overconfident (mean raw prob ~40% vs base rate ~3%).
+    # Apply a constant negative logit bias to pull predictions toward
+    # realistic base rates. This preserves whatever ranking signal exists.
+    WEAK_HEAD_BIAS = {
+        'wind':    -1.5,  # Pull ~38% raw -> ~12% (still allows discrimination)
+        'seismic': -2.5,  # Pull ~40% raw -> ~4%  (near-random, anchor to base rate)
+    }
+    if hazard in WEAK_HEAD_BIAS:
+        scaled_logit += WEAK_HEAD_BIAS[hazard]
 
     # Step 2: Seasonal prior (logit-space bias)
     if month and 1 <= month <= 12 and hazard in SEASONAL_LOGIT_BIAS:
@@ -181,7 +222,11 @@ def _apply_calibration(
     # Step 3: Sigmoid
     prob = 1.0 / (1.0 + math.exp(-scaled_logit))
 
-    return max(0.0, min(1.0, prob))
+    # Step 4: Base-rate ceiling (prevents absurd probabilities from near-random heads)
+    ceiling = BASE_RATE_CEILING.get(hazard, 1.0)
+    prob = min(prob, ceiling)
+
+    return max(0.0, prob)
 
 
 def _build_maps(hazard_df: pd.DataFrame):
