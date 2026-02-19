@@ -2,10 +2,16 @@
 Cloud-safe inference core for HazardLM-Diffusion v2.0.
 NO training dependencies - pure PyTorch inference only.
 
+Calibration pipeline (applied in order):
+  1. Temperature scaling  - per-hazard T fitted on validation set (NLL optimization)
+  2. Seasonal prior       - physics-informed logit bias by month (WA climatology)
+
 Updated for HazardLMDiffusion model API:
   model(static_cont, temporal, region_ids, state_ids, nlcd_ids)
   -> dict with {hazard}_prob and {hazard}_logits keys
 """
+import json
+import math
 import torch
 import torch.nn.functional as F
 import numpy as np
@@ -31,6 +37,152 @@ STATIC_FEATURE_COLS = [
 _COUNTY_MAP = {}
 _STATE_MAP = {}
 
+# --- Calibration state (loaded once, cached) ---
+_TEMPERATURES: Dict[str, float] = {}  # per-hazard temperature scaling factors
+
+# --- Seasonal prior: logit bias by month for WA state ---
+# Derived from WA climatology and clean label base rates.
+# Positive bias = increase risk, negative = suppress.
+# Values are in logit space (log-odds), so -2.0 is a strong suppression.
+#
+# Fire: WA fire season is June-October. Nov-Mar fires are extremely rare (<0.5%).
+# Winter: Winter storms peak Nov-Mar. Jun-Sep storms are very rare.
+# Wind: High-wind events peak Oct-Mar, but can occur year-round.
+# Flood: Year-round with slight winter peak (atmospheric rivers).
+# Seismic: No seasonal pattern (tectonic), so no bias applied.
+SEASONAL_LOGIT_BIAS = {
+    'fire': {
+        # month: logit_bias
+        1: -3.0,   # January  - virtually no WA wildfire
+        2: -3.0,   # February - virtually no WA wildfire
+        3: -2.0,   # March    - very rare, snowmelt not fire
+        4: -1.0,   # April    - rare, some early-season prescribed burns
+        5: -0.5,   # May      - occasional, season starting
+        6:  0.0,   # June     - fire season begins
+        7:  0.0,   # July     - peak fire season
+        8:  0.0,   # August   - peak fire season
+        9:  0.0,   # September - fire season
+        10: -0.5,  # October  - season winding down
+        11: -2.0,  # November - very rare
+        12: -3.0,  # December - virtually no WA wildfire
+    },
+    'winter': {
+        1:  0.0,   # January  - peak winter storm season
+        2:  0.0,   # February - peak winter storm season
+        3:  0.0,   # March    - still winter storms
+        4: -0.5,   # April    - transitioning
+        5: -1.5,   # May      - rare
+        6: -3.0,   # June     - no winter storms
+        7: -3.0,   # July     - no winter storms
+        8: -3.0,   # August   - no winter storms
+        9: -2.0,   # September - very rare early season
+        10: -0.5,  # October  - season starting
+        11:  0.0,  # November - winter storm season
+        12:  0.0,  # December - peak winter storm season
+    },
+    'wind': {
+        1:  0.0,   # January  - high wind season
+        2:  0.0,   # February - high wind season
+        3:  0.0,   # March    - high wind season
+        4: -0.3,   # April    - moderate
+        5: -0.5,   # May      - less common
+        6: -0.5,   # June     - less common
+        7: -0.5,   # July     - less common
+        8: -0.3,   # August   - less common
+        9:  0.0,   # September - picking up
+        10:  0.0,  # October  - high wind season
+        11:  0.0,  # November - high wind season
+        12:  0.0,  # December - high wind season
+    },
+    # Flood and seismic: no seasonal bias
+    'flood': {m: 0.0 for m in range(1, 13)},
+    'seismic': {m: 0.0 for m in range(1, 13)},
+}
+
+
+def load_temperature_scales(path: Optional[str] = None) -> Dict[str, float]:
+    """Load per-hazard temperature scales from JSON file.
+
+    Temperature scaling: calibrated_logit = raw_logit / T
+    T < 1 sharpens (more confident), T > 1 softens (less confident).
+    Fitted by minimizing NLL on the validation set.
+
+    Args:
+        path: Path to temperature_scales.json. If None, searches common locations.
+
+    Returns:
+        Dict mapping hazard type -> temperature (float > 0)
+    """
+    global _TEMPERATURES
+
+    # Already loaded
+    if _TEMPERATURES:
+        return _TEMPERATURES
+
+    search_paths = [
+        Path(path) if path else None,
+        Path('temperature_scales.json'),
+        Path('outputs/diffusion_clean_v1/temperature_scales.json'),
+        Path('data/temperature_scales.json'),
+    ]
+
+    for p in search_paths:
+        if p is not None and p.exists():
+            try:
+                with open(p) as f:
+                    data = json.load(f)
+                temps = data.get('temperatures', data)
+                _TEMPERATURES = {h: float(temps[h]) for h in HAZARD_TYPES if h in temps}
+                print(f"[CALIBRATION] Loaded temperature scales from {p}: {_TEMPERATURES}")
+                return _TEMPERATURES
+            except Exception as e:
+                print(f"[CALIBRATION] Error loading {p}: {e}")
+
+    print("[CALIBRATION] No temperature_scales.json found - using T=1.0 (uncalibrated)")
+    _TEMPERATURES = {h: 1.0 for h in HAZARD_TYPES}
+    return _TEMPERATURES
+
+
+def _apply_calibration(
+    raw_logit: float,
+    hazard: str,
+    month: int,
+    temperatures: Optional[Dict[str, float]] = None,
+) -> float:
+    """Apply calibration pipeline to a single raw logit.
+
+    Pipeline:
+      1. Temperature scaling:  logit_scaled = raw_logit / T
+      2. Seasonal prior:       logit_final  = logit_scaled + seasonal_bias(month)
+      3. Sigmoid:              prob = 1 / (1 + exp(-logit_final))
+
+    Args:
+        raw_logit: Raw logit from the model
+        hazard: Hazard type ('fire', 'flood', etc.)
+        month: Calendar month (1-12). 0 or None = no seasonal adjustment.
+        temperatures: Per-hazard temperature dict. Loaded from cache if None.
+
+    Returns:
+        Calibrated probability in [0, 1]
+    """
+    if temperatures is None:
+        temperatures = load_temperature_scales()
+
+    # Step 1: Temperature scaling
+    T = temperatures.get(hazard, 1.0)
+    T = max(T, 0.01)  # Guard against division by zero
+    scaled_logit = raw_logit / T
+
+    # Step 2: Seasonal prior (logit-space bias)
+    if month and 1 <= month <= 12 and hazard in SEASONAL_LOGIT_BIAS:
+        bias = SEASONAL_LOGIT_BIAS[hazard].get(month, 0.0)
+        scaled_logit += bias
+
+    # Step 3: Sigmoid
+    prob = 1.0 / (1.0 + math.exp(-scaled_logit))
+
+    return max(0.0, min(1.0, prob))
+
 
 def _build_maps(hazard_df: pd.DataFrame):
     """Build county and state maps from dataset (mirrors HazardDataset)."""
@@ -51,10 +203,13 @@ def predict_from_tensors(
     region_ids: torch.Tensor,
     state_ids: torch.Tensor,
     nlcd_ids: torch.Tensor,
-    hazard_types: list = None
+    hazard_types: list = None,
+    month: int = 0,
+    temperatures: Optional[Dict[str, float]] = None,
 ) -> Dict[str, float]:
     """
     Run HazardLMDiffusion inference from pre-built tensors.
+    Applies temperature scaling + seasonal prior calibration.
 
     Args:
         model: Loaded HazardLMDiffusion model
@@ -64,14 +219,20 @@ def predict_from_tensors(
         state_ids: [batch] state IDs (long)
         nlcd_ids: [batch] NLCD land cover IDs (long)
         hazard_types: List of hazard types to predict
+        month: Calendar month (1-12) for seasonal adjustment. 0 = no adjustment.
+        temperatures: Per-hazard temperature dict. Loaded from file if None.
 
     Returns:
-        Dict mapping hazard type -> probability (float in [0, 1])
+        Dict mapping hazard type -> calibrated probability (float in [0, 1])
     """
     if model is None:
         return {h: 0.0 for h in (hazard_types or HAZARD_TYPES)}
 
     hazard_types = hazard_types or HAZARD_TYPES
+
+    # Load temperatures if not provided
+    if temperatures is None:
+        temperatures = load_temperature_scales()
 
     model.eval()
     device = next(model.parameters()).device
@@ -86,18 +247,27 @@ def predict_from_tensors(
     # Forward pass (HazardLMDiffusion API)
     outputs = model(static_cont, temporal, region_ids, state_ids, nlcd_ids)
 
-    # Extract probabilities
+    # Extract calibrated probabilities
     risks = {}
     for h in hazard_types:
-        prob = 0.0
         if isinstance(outputs, dict):
-            prob_key = f'{h}_prob'
             logit_key = f'{h}_logits'
-            if prob_key in outputs:
-                prob = float(outputs[prob_key].cpu().numpy().flatten()[0])
-            elif logit_key in outputs:
-                prob = float(torch.sigmoid(outputs[logit_key]).cpu().numpy().flatten()[0])
-        risks[h] = max(0.0, min(1.0, prob))  # Clamp to [0, 1]
+            prob_key = f'{h}_prob'
+
+            if logit_key in outputs:
+                # Preferred: calibrate from raw logit
+                raw_logit = float(outputs[logit_key].cpu().numpy().flatten()[0])
+                risks[h] = _apply_calibration(raw_logit, h, month, temperatures)
+            elif prob_key in outputs:
+                # Fallback: convert prob -> logit, then calibrate
+                raw_prob = float(outputs[prob_key].cpu().numpy().flatten()[0])
+                raw_prob = max(1e-7, min(1 - 1e-7, raw_prob))  # Avoid log(0)
+                raw_logit = math.log(raw_prob / (1.0 - raw_prob))
+                risks[h] = _apply_calibration(raw_logit, h, month, temperatures)
+            else:
+                risks[h] = 0.0
+        else:
+            risks[h] = 0.0
 
     return risks
 
@@ -153,7 +323,7 @@ def build_tensors_from_county_data(
 
     # --- Temporal features ---
     # The clean dataset has no lag/roll/delta columns, so temporal is zero-filled
-    # (same as training — HazardDataset pads to 14x20)
+    # (same as training -- HazardDataset pads to 14x20)
     temporal = torch.zeros(1, temporal_seq_len, temporal_feat_dim, dtype=torch.float32)
 
     # --- Categorical IDs ---
@@ -178,6 +348,7 @@ def predict_county_risks_simple(
     """
     Simplified county risk prediction for cloud deployment.
     Uses available data from hazard_lm_clean_labeled.parquet.
+    Applies temperature scaling + seasonal prior calibration.
 
     Args:
         model: Loaded HazardLMDiffusion model
@@ -186,7 +357,7 @@ def predict_county_risks_simple(
         target_date: Target date for prediction (affects seasonal features)
 
     Returns:
-        Dict mapping hazard type -> probability
+        Dict mapping hazard type -> calibrated probability
     """
     if model is None:
         return _generate_fallback_risks(county_name)
@@ -194,6 +365,12 @@ def predict_county_risks_simple(
     # Build maps if not yet built
     if not _COUNTY_MAP and hazard_df is not None and len(hazard_df) > 0:
         _build_maps(hazard_df)
+
+    # Load temperature scales (cached after first call)
+    temperatures = load_temperature_scales()
+
+    # Determine month for seasonal adjustment
+    month = target_date.month if target_date is not None else 0
 
     # Normalize county name
     county_upper = county_name.upper().replace(' COUNTY', '').strip()
@@ -221,9 +398,10 @@ def predict_county_risks_simple(
         static_cont, temporal, region_ids, state_ids, nlcd_ids = \
             build_tensors_from_county_data(county_row, actual_county, target_date)
 
-        # Run inference
+        # Run inference with calibration
         risks = predict_from_tensors(
-            model, static_cont, temporal, region_ids, state_ids, nlcd_ids
+            model, static_cont, temporal, region_ids, state_ids, nlcd_ids,
+            month=month, temperatures=temperatures,
         )
         return risks
 
