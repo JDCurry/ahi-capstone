@@ -1,8 +1,13 @@
 """
-Cloud-safe inference core for Hazard-LM.
+Cloud-safe inference core for HazardLM-Diffusion v2.0.
 NO training dependencies - pure PyTorch inference only.
+
+Updated for HazardLMDiffusion model API:
+  model(static_cont, temporal, region_ids, state_ids, nlcd_ids)
+  -> dict with {hazard}_prob and {hazard}_logits keys
 """
 import torch
+import torch.nn.functional as F
 import numpy as np
 import pandas as pd
 from pathlib import Path
@@ -12,144 +17,156 @@ from typing import Dict, Optional, Tuple
 # Hazard types
 HAZARD_TYPES = ['fire', 'flood', 'wind', 'winter', 'seismic']
 
+# Feature columns used during training (must match train_diffusion.py / HazardDataset)
+# These are the 21 static features from hazard_lm_clean_labeled.parquet
+STATIC_FEATURE_COLS = [
+    'latitude', 'longitude', 'day_of_year', 'month', 'year',
+    'tmmx', 'tmmn', 'rmin', 'rmax', 'vs', 'erc', 'pr', 'vpd',
+    'red_flag_active', 'tmmx_3d_mean', 'pr_3d_mean', 'vs_3d_mean',
+    'elevation', 'forest_fraction', 'urban_fraction', 'pop_density'
+]
+
+# County name -> county_id mapping (mod 250 to match training)
+# Built at runtime from the dataset; cached here for fallback
+_COUNTY_MAP = {}
+_STATE_MAP = {}
+
+
+def _build_maps(hazard_df: pd.DataFrame):
+    """Build county and state maps from dataset (mirrors HazardDataset)."""
+    global _COUNTY_MAP, _STATE_MAP
+    if 'county' in hazard_df.columns:
+        counties = sorted(hazard_df['county'].unique())
+        _COUNTY_MAP = {c: i % 250 for i, c in enumerate(counties)}
+    if 'state' in hazard_df.columns:
+        states = sorted(hazard_df['state'].unique())
+        _STATE_MAP = {s: i for i, s in enumerate(states)}
+
 
 @torch.no_grad()
 def predict_from_tensors(
     model,
-    static: torch.Tensor,
+    static_cont: torch.Tensor,
     temporal: torch.Tensor,
-    image: torch.Tensor,
-    nlcd: torch.Tensor,
+    region_ids: torch.Tensor,
+    state_ids: torch.Tensor,
+    nlcd_ids: torch.Tensor,
     hazard_types: list = None
 ) -> Dict[str, float]:
     """
-    Run model inference from pre-built tensors.
-    This is the cloud-safe core - no dataset dependencies.
-    
+    Run HazardLMDiffusion inference from pre-built tensors.
+
     Args:
-        model: Loaded HazardLM model
-        static: [1, static_dim] static features
-        temporal: [1, seq_len, feat_dim] temporal sequence
-        image: [1, C, H, W] satellite image tensor
-        nlcd: [1] NLCD land cover code
+        model: Loaded HazardLMDiffusion model
+        static_cont: [batch, static_dim] static continuous features (padded to 50)
+        temporal: [batch, seq_len, feat_dim] temporal sequence (14, 20)
+        region_ids: [batch] county/region IDs (long)
+        state_ids: [batch] state IDs (long)
+        nlcd_ids: [batch] NLCD land cover IDs (long)
         hazard_types: List of hazard types to predict
-    
+
     Returns:
-        Dict mapping hazard type -> probability
+        Dict mapping hazard type -> probability (float in [0, 1])
     """
     if model is None:
         return {h: 0.0 for h in (hazard_types or HAZARD_TYPES)}
-    
+
     hazard_types = hazard_types or HAZARD_TYPES
-    
+
     model.eval()
     device = next(model.parameters()).device
-    
+
     # Move tensors to device
-    static = static.to(device).float()
+    static_cont = static_cont.to(device).float()
     temporal = temporal.to(device).float()
-    image = image.to(device).float()
-    nlcd = nlcd.to(device)
-    
-    # Forward pass
-    outputs = model(static, temporal, image, nlcd)
-    
+    region_ids = region_ids.to(device).long()
+    state_ids = state_ids.to(device).long()
+    nlcd_ids = nlcd_ids.to(device).long()
+
+    # Forward pass (HazardLMDiffusion API)
+    outputs = model(static_cont, temporal, region_ids, state_ids, nlcd_ids)
+
     # Extract probabilities
     risks = {}
     for h in hazard_types:
         prob = 0.0
         if isinstance(outputs, dict):
             prob_key = f'{h}_prob'
+            logit_key = f'{h}_logits'
             if prob_key in outputs:
                 prob = float(outputs[prob_key].cpu().numpy().flatten()[0])
-            elif h in outputs:
-                prob = float(torch.sigmoid(outputs[h]).cpu().numpy().flatten()[0])
-        risks[h] = max(0.0, min(1.0, prob))  # Clamp to [0,1]
-    
+            elif logit_key in outputs:
+                prob = float(torch.sigmoid(outputs[logit_key]).cpu().numpy().flatten()[0])
+        risks[h] = max(0.0, min(1.0, prob))  # Clamp to [0, 1]
+
     return risks
-
-
-def build_dummy_tensors(
-    static_dim: int = 64,
-    temporal_seq_len: int = 14,
-    temporal_feat_dim: int = 32,
-    image_size: int = 64,
-) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-    """
-    Build dummy tensors for testing/fallback.
-    Returns: (static, temporal, image, nlcd)
-    """
-    static = torch.zeros(1, static_dim)
-    temporal = torch.zeros(1, temporal_seq_len, temporal_feat_dim)
-    image = torch.zeros(1, 3, image_size, image_size)
-    nlcd = torch.tensor([42])  # Default forest
-    return static, temporal, image, nlcd
 
 
 def build_tensors_from_county_data(
     county_row: pd.Series,
-    static_dim: int = 64,
+    county_name: str = '',
+    target_date: date = None,
+    static_pad_dim: int = 50,
     temporal_seq_len: int = 14,
-    temporal_feat_dim: int = 32,
-) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+    temporal_feat_dim: int = 20,
+) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
     """
     Build inference tensors from a county data row.
-    Uses available features from the hazard dataset.
+    Matches the HazardDataset.__getitem__ format from train_diffusion.py.
+
+    Returns: (static_cont, temporal, region_ids, state_ids, nlcd_ids)
     """
-    # Static features - extract what's available
-    static_cols = [
-        'population', 'svi_score', 'elevation_mean', 'slope_mean',
-        'forest_pct', 'urban_pct', 'ag_pct', 'water_pct',
-        'fire_history', 'flood_history', 'wind_history', 'winter_history'
-    ]
-    
+    # --- Static continuous features ---
     static_values = []
-    for col in static_cols:
+    for col in STATIC_FEATURE_COLS:
         if col in county_row.index:
             val = county_row[col]
-            static_values.append(float(val) if pd.notna(val) else 0.0)
+            try:
+                static_values.append(float(val) if pd.notna(val) else 0.0)
+            except (ValueError, TypeError):
+                static_values.append(0.0)
         else:
-            static_values.append(0.0)
-    
-    # Pad to expected dimension
-    while len(static_values) < static_dim:
+            # If column not present, inject sensible defaults for date-derived cols
+            if col == 'day_of_year' and target_date is not None:
+                static_values.append(float(target_date.timetuple().tm_yday))
+            elif col == 'month' and target_date is not None:
+                static_values.append(float(target_date.month))
+            elif col == 'year' and target_date is not None:
+                static_values.append(float(target_date.year))
+            else:
+                static_values.append(0.0)
+
+    # Override date-derived features with target_date if provided
+    if target_date is not None:
+        for i, col in enumerate(STATIC_FEATURE_COLS):
+            if col == 'day_of_year':
+                static_values[i] = float(target_date.timetuple().tm_yday)
+            elif col == 'month':
+                static_values[i] = float(target_date.month)
+            elif col == 'year':
+                static_values[i] = float(target_date.year)
+
+    # Pad to expected dimension (50)
+    while len(static_values) < static_pad_dim:
         static_values.append(0.0)
-    static = torch.tensor(static_values[:static_dim]).unsqueeze(0)
-    
-    # Temporal features - use climate/weather if available
-    temporal_cols = [
-        'tmax_mean', 'tmin_mean', 'pr_mean', 'rmax_mean', 'rmin_mean',
-        'vs_mean', 'bi_mean', 'fm100_mean', 'fm1000_mean', 'erc_mean'
-    ]
-    
-    temporal_row = []
-    for col in temporal_cols:
-        if col in county_row.index:
-            val = county_row[col]
-            temporal_row.append(float(val) if pd.notna(val) else 0.0)
-        else:
-            temporal_row.append(0.0)
-    
-    # Pad features
-    while len(temporal_row) < temporal_feat_dim:
-        temporal_row.append(0.0)
-    
-    # Repeat for sequence length (simple approach - use same data)
-    temporal = torch.tensor([temporal_row[:temporal_feat_dim]] * temporal_seq_len).unsqueeze(0)
-    
-    # Image - placeholder (would need to load actual satellite imagery)
-    image = torch.zeros(1, 3, 64, 64)
-    
-    # NLCD code
-    nlcd_val = 42  # Default forest
-    if 'dominant_nlcd' in county_row.index:
-        try:
-            nlcd_val = int(county_row['dominant_nlcd'])
-        except:
-            pass
-    nlcd = torch.tensor([nlcd_val])
-    
-    return static, temporal, image, nlcd
+    static_cont = torch.tensor(static_values[:static_pad_dim], dtype=torch.float32).unsqueeze(0)
+
+    # --- Temporal features ---
+    # The clean dataset has no lag/roll/delta columns, so temporal is zero-filled
+    # (same as training — HazardDataset pads to 14x20)
+    temporal = torch.zeros(1, temporal_seq_len, temporal_feat_dim, dtype=torch.float32)
+
+    # --- Categorical IDs ---
+    county_id = _COUNTY_MAP.get(county_name, 0) if county_name else 0
+    state_name = county_row.get('state', 'WA') if 'state' in county_row.index else 'WA'
+    state_id = _STATE_MAP.get(state_name, 0)
+    nlcd_id = 0  # Placeholder (matches training)
+
+    region_ids = torch.tensor([county_id], dtype=torch.long)
+    state_ids = torch.tensor([state_id], dtype=torch.long)
+    nlcd_ids = torch.tensor([nlcd_id], dtype=torch.long)
+
+    return static_cont, temporal, region_ids, state_ids, nlcd_ids
 
 
 def predict_county_risks_simple(
@@ -160,59 +177,76 @@ def predict_county_risks_simple(
 ) -> Dict[str, float]:
     """
     Simplified county risk prediction for cloud deployment.
-    Uses available data from hazard_lm_dataset.parquet.
-    
+    Uses available data from hazard_lm_clean_labeled.parquet.
+
     Args:
-        model: Loaded HazardLM model
+        model: Loaded HazardLMDiffusion model
         county_name: Name of county (e.g., "King", "Pierce")
         hazard_df: DataFrame with county hazard data
-        target_date: Target date (not used in simple version)
-    
+        target_date: Target date for prediction (affects seasonal features)
+
     Returns:
         Dict mapping hazard type -> probability
     """
     if model is None:
-        # Return plausible fallback values
         return _generate_fallback_risks(county_name)
-    
+
+    # Build maps if not yet built
+    if not _COUNTY_MAP and hazard_df is not None and len(hazard_df) > 0:
+        _build_maps(hazard_df)
+
     # Normalize county name
     county_upper = county_name.upper().replace(' COUNTY', '').strip()
-    
+
     # Find county in dataframe
-    county_mask = hazard_df['county'].str.upper().str.replace(' COUNTY', '').str.strip() == county_upper
-    county_rows = hazard_df[county_mask]
-    
+    if hazard_df is not None and len(hazard_df) > 0 and 'county' in hazard_df.columns:
+        county_mask = hazard_df['county'].str.upper().str.replace(' COUNTY', '').str.strip() == county_upper
+        county_rows = hazard_df[county_mask]
+    else:
+        county_rows = pd.DataFrame()
+
     if len(county_rows) == 0:
         return _generate_fallback_risks(county_name)
-    
+
     # Use most recent row for this county
-    county_row = county_rows.iloc[-1]
-    
+    if 'date' in county_rows.columns:
+        county_rows = county_rows.sort_values('date', ascending=False)
+    county_row = county_rows.iloc[0]
+
+    # Resolve actual county name from data (preserves casing for map lookup)
+    actual_county = county_row.get('county', county_name)
+
     try:
-        # Build tensors from available data
-        static, temporal, image, nlcd = build_tensors_from_county_data(county_row)
-        
+        # Build tensors matching HazardLMDiffusion forward() signature
+        static_cont, temporal, region_ids, state_ids, nlcd_ids = \
+            build_tensors_from_county_data(county_row, actual_county, target_date)
+
         # Run inference
-        risks = predict_from_tensors(model, static, temporal, image, nlcd)
+        risks = predict_from_tensors(
+            model, static_cont, temporal, region_ids, state_ids, nlcd_ids
+        )
         return risks
-        
+
     except Exception as e:
         print(f"[INFERENCE] Error predicting for {county_name}: {e}")
+        import traceback
+        traceback.print_exc()
         return _generate_fallback_risks(county_name)
 
 
 def _generate_fallback_risks(county_name: str) -> Dict[str, float]:
-    """Generate plausible fallback risks based on county name hash."""
+    """Generate plausible fallback risks based on county name hash.
+    Used when model or data is unavailable."""
     try:
         seed = abs(hash(county_name)) % 10000
-    except:
+    except Exception:
         seed = 42
-    
-    np.random.seed(seed)
+
+    rng = np.random.RandomState(seed)
     return {
-        'fire': float(np.random.beta(2, 5)),
-        'flood': float(np.random.beta(2, 8)),
-        'wind': float(np.random.beta(2, 6)),
-        'winter': float(np.random.beta(2, 5)),
-        'seismic': float(np.random.beta(1, 15))
+        'fire': float(rng.beta(2, 5)),
+        'flood': float(rng.beta(2, 8)),
+        'wind': float(rng.beta(2, 6)),
+        'winter': float(rng.beta(2, 5)),
+        'seismic': float(rng.beta(1, 15))
     }
