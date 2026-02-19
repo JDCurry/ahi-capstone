@@ -3397,32 +3397,6 @@ def page_model_evaluation():
     avg_auc_xgb = sum(aucs_xgb) / len(aucs_xgb)
     st.success(f"**XGBoost Mean AUC: {avg_auc_xgb:.3f}** — Mean ECE: 2.0% (well-calibrated across all hazards)")
 
-    # ------- HazardLM-Diffusion -------
-    st.markdown("---")
-    st.markdown("### HazardLM-Diffusion (Deep Learning)")
-    st.caption("Transformer with heat kernel attention, focal loss, and seasonal penalties — training in progress")
-
-    # Try to load actual results from the output directory
-    diffusion_results_path = Path("outputs/diffusion_clean_v1/test_results.json")
-    if diffusion_results_path.exists():
-        try:
-            with open(diffusion_results_path) as f:
-                diff_res = json.load(f)
-            diff_data = []
-            for h in ['fire', 'flood', 'wind', 'winter', 'seismic']:
-                auc_val = diff_res.get(f'{h}_auc', 0)
-                ece_val = diff_res.get(f'{h}_ece', 0)
-                quality = "Excellent" if auc_val >= 0.8 else ("Good" if auc_val >= 0.7 else "Fair" if auc_val >= 0.6 else "Developing")
-                diff_data.append({"Hazard": h.capitalize(), "AUC": round(auc_val, 3), "ECE": f"{ece_val*100:.1f}%", "Quality": quality})
-            st.dataframe(pd.DataFrame(diff_data), use_container_width=True, hide_index=True)
-            diff_aucs = [diff_res.get(f'{h}_auc', 0) for h in ['fire', 'flood', 'wind', 'winter', 'seismic']]
-            avg_diff = sum(diff_aucs) / len(diff_aucs)
-            st.info(f"**Diffusion Model Mean AUC: {avg_diff:.3f}** — Model contributes diversity to ensemble even when individual AUC is lower than XGBoost.")
-        except Exception as e:
-            st.warning(f"Could not load diffusion test results: {e}")
-    else:
-        st.info("Diffusion model test results not yet available. Training may still be in progress.")
-
     # ------- Ensemble (if available) -------
     ensemble_results_path = Path("outputs/ensemble/ensemble_test_results.json")
     if ensemble_results_path.exists():
