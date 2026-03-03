@@ -2496,10 +2496,17 @@ def page_ai_predictions():
                     with st.expander("How to interpret these numbers", expanded=False):
                         st.markdown(f"""
                         **What the percentages mean:**
-                        - These are **relative risk probabilities** for the {MAX_FORECAST_DAYS}-day forecast window
-                        - They represent the model's confidence that hazard conditions will be present, not the certainty of an event
-                        - Values are calibrated against historical county-level data (2000-2025)
-                        
+                        - These are **calibrated risk probabilities** for the {MAX_FORECAST_DAYS}-day forecast window
+                        - They represent the likelihood that hazard conditions will be present, not the certainty of a specific event
+                        - Probabilities are derived from **statewide learned patterns** across all 39 WA counties (2000-2025), not solely from this county's history
+                        - A county with few or zero historical events for a hazard can still show elevated risk if current conditions resemble those that preceded events elsewhere in Washington
+
+                        **How predictions are produced:**
+                        - The model analyzes weather conditions, geography, season, and land characteristics
+                        - Raw model output passes through a calibration pipeline: temperature scaling, seasonal adjustment, and a plausibility ceiling
+                        - Seasonal priors suppress predictions that are climatologically implausible (e.g., wildfire in January, winter storms in July)
+                        - See the **Decision Audit** below for the specific calibration steps applied to each hazard
+
                         **Risk level thresholds:**
                         | Probability | Level | Recommended Response |
                         |-------------|-------|---------------------|
@@ -2508,20 +2515,26 @@ def page_ai_predictions():
                         | 30-50% | Elevated | Active preparation |
                         | 50-70% | High | Pre-position resources |
                         | > 70% | Severe | Elevated readiness |
-                        
+
                         **Important caveats:**
                         - Model uses county-aggregated data; local conditions may vary significantly
                         - Always cross-reference with NWS forecasts and local observations
-                        - Seismic risk is based on long-term patterns, not short-term prediction
+                        - Wind and seismic predictions have weaker model discrimination and are constrained to conservative ranges
+                        - Seismic risk reflects long-term geographic patterns, not short-term earthquake prediction
                         """)
                     
                     # Decision Audit - Evidentiary basis for predictions
                     if DECISION_AUDIT_AVAILABLE and sorted_risks:
                         with st.expander("Decision Audit (Evidentiary Basis)", expanded=False):
                             st.markdown("""
-                            The Decision Audit provides the evidentiary basis for 
-                            each risk prediction. Use this information to support defensible decisions 
-                            and cite specific data sources in briefings.
+                            **What is this?** The Decision Audit shows the evidence and calibration behind each prediction.
+                            Use this to understand *why* a probability is what it is and to cite specific evidence in briefings.
+
+                            **Key context:** Predictions are based on statewide patterns learned from 370,000+ observations
+                            across all 39 WA counties. A county may show elevated risk even with few local historical events
+                            if current conditions match patterns that preceded events in similar counties. The **Model AUC**
+                            score indicates how well the model distinguishes between event and non-event conditions
+                            (1.0 = perfect, 0.5 = random guess).
                             """)
                             
                             # Build audit for top 3 hazards

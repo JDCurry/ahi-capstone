@@ -70,7 +70,7 @@ SEASONAL_LOGIT_BIAS = {
     'winter': {
         1:  0.0,   # January  - peak winter storm season
         2:  0.0,   # February - peak winter storm season
-        3:  0.0,   # March    - still winter storms
+        3: -0.5,   # March    - transition month, declining storm frequency
         4: -0.5,   # April    - transitioning
         5: -1.5,   # May      - rare
         6: -3.0,   # June     - no winter storms
@@ -119,6 +119,33 @@ BASE_RATE_CEILING = {
     'winter':  0.35,  # 35% max - best head (AUC 0.74), generous ceiling
     'seismic': 0.08,  # 8% max  - near-random head (AUC 0.50), tight ceiling
 }
+
+# --- Month-aware ceilings for seasonal hazards ---
+# During transition months, the max plausible daily probability is naturally
+# lower than during peak season. This prevents the "wall of 35%" effect
+# where most counties hit the same ceiling and lose differentiation.
+SEASONAL_CEILING = {
+    'winter': {
+        1: 0.35, 2: 0.35,   # Peak winter storm season
+        3: 0.25,             # Transition month - storms declining
+        4: 0.15,             # Late transition
+        5: 0.08, 6: 0.05, 7: 0.05, 8: 0.05,  # Off-season
+        9: 0.08,             # Early transition
+        10: 0.20,            # Season starting
+        11: 0.35, 12: 0.35,  # Peak winter storm season
+    },
+}
+
+
+def _get_ceiling(hazard: str, month: int) -> float:
+    """Get the effective probability ceiling for a hazard in a given month.
+
+    Uses month-specific ceiling for seasonal hazards (winter),
+    falls back to BASE_RATE_CEILING for non-seasonal or unknown month.
+    """
+    if month and 1 <= month <= 12 and hazard in SEASONAL_CEILING:
+        return SEASONAL_CEILING[hazard][month]
+    return BASE_RATE_CEILING.get(hazard, 1.0)
 
 
 def load_temperature_scales(path: Optional[str] = None) -> Dict[str, float]:
@@ -223,7 +250,8 @@ def _apply_calibration(
     prob = 1.0 / (1.0 + math.exp(-scaled_logit))
 
     # Step 4: Base-rate ceiling (prevents absurd probabilities from near-random heads)
-    ceiling = BASE_RATE_CEILING.get(hazard, 1.0)
+    # Uses month-aware ceiling for seasonal hazards (e.g., winter in March = 0.25)
+    ceiling = _get_ceiling(hazard, month)
     prob = min(prob, ceiling)
 
     return max(0.0, prob)
