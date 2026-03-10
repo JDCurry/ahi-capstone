@@ -89,12 +89,22 @@ except ImportError:
 
 # Shared inference helpers - use cloud-safe inference_core (no training dependencies)
 try:
-    from inference_core import predict_county_risks_simple
+    from inference_core import predict_county_risks_simple, predict_from_ahi_v2
     predict_county_risks = predict_county_risks_simple  # Alias for compatibility
 except Exception as _inf_err:
     print(f"[IMPORT] inference_core import failed: {_inf_err}")
     predict_county_risks = None
     predict_county_risks_simple = None
+    predict_from_ahi_v2 = None
+
+# AHI v2 stacked mesh model
+try:
+    from ahi_v2_model import AHIv2Model, AHIv2Config
+    from ahi_v2_graph import build_adjacency_graph
+    AHI_V2_AVAILABLE = True
+except ImportError as _v2_err:
+    print(f"[IMPORT] AHI v2 import failed: {_v2_err}")
+    AHI_V2_AVAILABLE = False
 
 # Decision audit module for evidentiary basis
 try:
@@ -137,6 +147,20 @@ MODEL_URL = "https://media.githubusercontent.com/media/JDCurry/ahi-capstone/main
 MODEL_LOAD_ERROR = None
 MODEL_DISPLAY_NAME = "HazardLM-Diffusion v2.0"
 MIN_MODEL_SIZE = 5_000_000  # 5MB - diffusion model is ~10MB (880K params)
+
+# AHI v2 model paths
+V2_MODEL_PATH = Path("outputs/ahi_v2/best_model.pt")
+V2_MODEL_PATH_LOCAL = V2_MODEL_PATH
+V2_MODEL_PATH_CLOUD = Path("/mount/src/ahi-capstone/outputs/ahi_v2/best_model.pt")
+V2_MODEL_DISPLAY_NAME = "AHI v2 Stacked Mesh"
+
+# Available model choices
+MODEL_CHOICES = {"v1": MODEL_DISPLAY_NAME}
+# Check if v2 checkpoint exists
+for _v2p in [V2_MODEL_PATH_LOCAL, V2_MODEL_PATH_CLOUD]:
+    if _v2p.exists() and _v2p.stat().st_size > MIN_MODEL_SIZE:
+        MODEL_CHOICES["v2"] = V2_MODEL_DISPLAY_NAME
+        break
 
 def get_model_path():
     """Get the best available model path."""
@@ -527,6 +551,48 @@ def load_hazard_model():
         return None, False
 
 
+@st.cache_resource
+def load_v2_model():
+    """Load AHI v2 stacked mesh model + adjacency graph."""
+    if not AHI_V2_AVAILABLE:
+        return None, None, False
+
+    # Find v2 checkpoint
+    v2_path = None
+    for p in [V2_MODEL_PATH_LOCAL, V2_MODEL_PATH_CLOUD]:
+        if p.exists() and p.stat().st_size > MIN_MODEL_SIZE:
+            v2_path = p
+            break
+
+    if v2_path is None:
+        print("[V2] No v2 checkpoint found")
+        return None, None, False
+
+    try:
+        print(f"[V2] Loading AHI v2 from {v2_path}...")
+        config = AHIv2Config()
+        model = AHIv2Model(config)
+
+        state = torch.load(str(v2_path), map_location='cpu', weights_only=False)
+        sd = state.get('model_state_dict', state.get('state_dict', state))
+        model.load_state_dict(sd, strict=False)
+        model.eval()
+
+        total_params = sum(p.numel() for p in model.parameters())
+        print(f"[V2] Model loaded: {total_params:,} params, gate={model.coupling.gate.item():.4f}")
+
+        # Load adjacency graph
+        adjacency, _, _, county_names = build_adjacency_graph()
+        print(f"[V2] Adjacency graph: {len(county_names)} counties")
+
+        return model, adjacency, True
+
+    except Exception as e:
+        import traceback
+        print(f"[V2] EXCEPTION: {e}\n{traceback.format_exc()}")
+        return None, None, False
+
+
 @st.cache_data
 def load_hazard_data():
     """Load hazard dataset"""
@@ -883,35 +949,86 @@ def get_plotly_theme():
 def predict_and_summarize(county_identifier: str, target_date: datetime.date):
     """Wrapper: run model prediction for a county and return (risks, summary).
 
-    - Uses `load_hazard_model()` to load the promoted model.
-    - Uses shared `predict_county_risks` and LLM helpers when available.
+    Routes to AHI v2 (stacked mesh) or v1 (heat kernel diffusion) based on
+    the sidebar model selector stored in st.session_state.selected_model.
     """
-    # Load model
-    try:
-        model, ok = load_hazard_model()
-        if not ok or model is None:
-            return None, 'Model not available'
-    except Exception as e:
-        return None, f'Model load failed: {e}'
+    use_v2 = st.session_state.get('selected_model', 'v1') == 'v2'
 
-    # Load hazard dataset for inference
+    # Load hazard dataset for inference (shared by both v1 and v2)
     try:
         hazard_df = pd.read_parquet(DATA_DIR / 'hazard_lm_clean_labeled.parquet')
-    except Exception as e:
+    except Exception:
         hazard_df = None
 
-    # Run prediction (shared helper if imported)
-    try:
-        if predict_county_risks is not None and hazard_df is not None:
-            risks = predict_county_risks(model, county_identifier, hazard_df, target_date)
-        elif predict_county_risks is not None:
-            # Try without hazard_df (will use fallback internally)
-            risks = predict_county_risks(model, county_identifier, pd.DataFrame(), target_date)
-        else:
-            # No prediction helper available - return error
-            return None, 'Prediction helper not available. Model loaded but inference pipeline not configured.'
-    except Exception as e:
-        return None, f'Prediction failed: {e}'
+    # ------ AHI v2 Stacked Mesh Path ------
+    if use_v2 and AHI_V2_AVAILABLE and predict_from_ahi_v2 is not None:
+        try:
+            v2_model, adjacency, v2_ok = load_v2_model()
+            if not v2_ok or v2_model is None:
+                return None, 'AHI v2 model not available — check outputs/ahi_v2/best_model.pt'
+        except Exception as e:
+            return None, f'AHI v2 load failed: {e}'
+
+        try:
+            import inference_core as _ic
+            from ahi_v2_graph import get_batch_adjacency
+
+            # Build ID maps if needed
+            if not _ic._COUNTY_MAP and hazard_df is not None and len(hazard_df) > 0:
+                _ic._build_maps(hazard_df)
+
+            # Locate county data
+            county_upper = county_identifier.upper().replace(' COUNTY', '').strip()
+            if hazard_df is not None and len(hazard_df) > 0 and 'county' in hazard_df.columns:
+                county_mask = hazard_df['county'].str.upper().str.replace(' COUNTY', '').str.strip() == county_upper
+                county_rows = hazard_df[county_mask]
+            else:
+                county_rows = pd.DataFrame()
+
+            if len(county_rows) == 0:
+                return None, f'No data found for county: {county_identifier}'
+
+            if 'date' in county_rows.columns:
+                county_rows = county_rows.sort_values('date', ascending=False)
+            county_row = county_rows.iloc[0]
+            actual_county = county_row.get('county', county_identifier)
+
+            # Build tensors (same as v1)
+            static_cont, temporal, region_ids, state_ids, nlcd_ids = \
+                _ic.build_tensors_from_county_data(county_row, actual_county, target_date)
+
+            # Build spatial adjacency mask for this batch
+            num_nodes = adjacency.size(0)
+            spatial_mask = get_batch_adjacency(adjacency, region_ids, num_nodes)
+
+            month = target_date.month if target_date else 0
+            risks = predict_from_ahi_v2(
+                v2_model, static_cont, temporal, region_ids, state_ids, nlcd_ids,
+                adjacency_mask=spatial_mask, month=month,
+            )
+        except Exception as e:
+            import traceback
+            traceback.print_exc()
+            return None, f'AHI v2 prediction failed: {e}'
+
+    # ------ v1 Heat Kernel Diffusion Path ------
+    else:
+        try:
+            model, ok = load_hazard_model()
+            if not ok or model is None:
+                return None, 'Model not available'
+        except Exception as e:
+            return None, f'Model load failed: {e}'
+
+        try:
+            if predict_county_risks is not None and hazard_df is not None:
+                risks = predict_county_risks(model, county_identifier, hazard_df, target_date)
+            elif predict_county_risks is not None:
+                risks = predict_county_risks(model, county_identifier, pd.DataFrame(), target_date)
+            else:
+                return None, 'Prediction helper not available. Model loaded but inference pipeline not configured.'
+        except Exception as e:
+            return None, f'Prediction failed: {e}'
 
     # LLM summary (best-effort)
     try:
@@ -965,9 +1082,17 @@ def render_header():
     current_time = now_pst.strftime("%H:%M:%S")
     current_date = now_pst.strftime("%B %d, %Y")
     
-    model, model_ok = load_hazard_model()
+    # Determine active model status
+    use_v2 = st.session_state.get('selected_model', 'v1') == 'v2'
+    if use_v2 and AHI_V2_AVAILABLE:
+        _v2m, _v2a, v2_ok = load_v2_model()
+        model_ok = v2_ok
+        active_model_name = V2_MODEL_DISPLAY_NAME
+    else:
+        model, model_ok = load_hazard_model()
+        active_model_name = MODEL_DISPLAY_NAME
     status_color = COLORS['success'] if model_ok else COLORS['warning']
-    status_text = f"{MODEL_DISPLAY_NAME} Online" if model_ok else "Model Offline"
+    status_text = f"{active_model_name} Online" if model_ok else "Model Offline"
     
     st.markdown(f"""
     <div class="header-container">
@@ -1057,8 +1182,31 @@ def render_sidebar():
         if st.button("About This Project", use_container_width=True):
             st.session_state.page = 'about'
         
+        # ---- Model Selector ----
+        if len(MODEL_CHOICES) > 1:
+            st.markdown(f"<p style='color: {COLORS['text_tertiary']}; font-size: 14px; font-weight: 600; text-transform: uppercase; margin-top: 20px; letter-spacing: 0.5px;'>Prediction Model</p>", unsafe_allow_html=True)
+            # Initialize default
+            if 'selected_model' not in st.session_state:
+                st.session_state.selected_model = 'v2' if 'v2' in MODEL_CHOICES else 'v1'
+            selected_model = st.radio(
+                "Select prediction model",
+                options=list(MODEL_CHOICES.keys()),
+                format_func=lambda k: MODEL_CHOICES[k],
+                index=list(MODEL_CHOICES.keys()).index(st.session_state.get('selected_model', 'v1')),
+                label_visibility="collapsed",
+            )
+            st.session_state.selected_model = selected_model
+            # Show model info
+            if selected_model == 'v2':
+                st.caption("🔬 Stacked Mesh (1.3M params) — AUC 0.819")
+            else:
+                st.caption("📡 Heat Kernel Diffusion (880K params) — AUC 0.641")
+        else:
+            if 'selected_model' not in st.session_state:
+                st.session_state.selected_model = 'v1'
+
         st.markdown("---")
-        
+
         # Advanced debug toggle (hidden by default)
         try:
             adv = st.checkbox('Show advanced debug/logs', value=False, help='Enable detailed logs and developer diagnostics')
@@ -2209,11 +2357,18 @@ def page_mitigation_planning():
 
 def page_ai_predictions():
     st.markdown("## Quick Predict")
-    
-    model, model_ok = load_hazard_model()
-    
+
+    # Check model availability based on selected model
+    use_v2 = st.session_state.get('selected_model', 'v1') == 'v2'
+    if use_v2 and AHI_V2_AVAILABLE:
+        _v2m, _v2a, model_ok = load_v2_model()
+        active_name = V2_MODEL_DISPLAY_NAME
+    else:
+        model, model_ok = load_hazard_model()
+        active_name = MODEL_DISPLAY_NAME
+
     if not model_ok:
-        st.warning("Hazard-LM model not available. Ensure outputs/hazard_lm/pretrain_finetune/finetune/best_model.pt exists.")
+        st.warning(f"{active_name} not available. Check model checkpoint exists.")
         return
     
     # MODEL LOADED message commented out - visible from other dashboard areas

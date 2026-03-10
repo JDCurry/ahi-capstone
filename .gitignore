@@ -30,3 +30,8 @@ Thumbs.db
 # Local development
 .env
 *.local
+
+# Training checkpoints (keep only best_model.pt)
+outputs/*/checkpoint_epoch_*.pt
+outputs/*/training_history.json
+outputs/*/gate_history.json

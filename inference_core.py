@@ -485,6 +485,78 @@ def predict_county_risks_simple(
         return _generate_fallback_risks(county_name)
 
 
+@torch.no_grad()
+def predict_from_ahi_v2(
+    model,
+    static_cont: torch.Tensor,
+    temporal: torch.Tensor,
+    region_ids: torch.Tensor,
+    state_ids: torch.Tensor,
+    nlcd_ids: torch.Tensor,
+    adjacency_mask: torch.Tensor,
+    hazard_types: list = None,
+    month: int = 0,
+    temperatures: Optional[Dict[str, float]] = None,
+) -> Dict[str, float]:
+    """
+    Run AHI v2 stacked mesh inference with spatial adjacency mask.
+    Applies the same calibration pipeline as v1.
+
+    Args:
+        model: Loaded AHIv2Model
+        static_cont: [batch, 50] static features
+        temporal: [batch, 14, 20] temporal sequence
+        region_ids: [batch] county IDs
+        state_ids: [batch] state IDs
+        nlcd_ids: [batch] NLCD IDs
+        adjacency_mask: [batch, batch] boolean adjacency mask
+        hazard_types: Hazard types to predict
+        month: Calendar month (1-12)
+        temperatures: Per-hazard temperature dict
+
+    Returns:
+        Dict mapping hazard -> calibrated probability per county
+        If batch > 1: Dict[str, list[float]]
+        If batch == 1: Dict[str, float]
+    """
+    hazard_types = hazard_types or HAZARD_TYPES
+
+    if temperatures is None:
+        temperatures = load_temperature_scales()
+
+    model.eval()
+    device = next(model.parameters()).device
+
+    static_cont = static_cont.to(device).float()
+    temporal = temporal.to(device).float()
+    region_ids = region_ids.to(device).long()
+    state_ids = state_ids.to(device).long()
+    nlcd_ids = nlcd_ids.to(device).long()
+    adjacency_mask = adjacency_mask.to(device)
+
+    outputs = model(
+        static_cont, temporal, region_ids, state_ids, nlcd_ids,
+        spatial_mask=adjacency_mask,
+    )
+
+    batch_size = static_cont.size(0)
+    if batch_size == 1:
+        # Single county: return scalar probabilities
+        risks = {}
+        for h in hazard_types:
+            raw_logit = float(outputs[f'{h}_logits'].cpu().numpy().flatten()[0])
+            risks[h] = _apply_calibration(raw_logit, h, month, temperatures)
+        return risks
+    else:
+        # Multiple counties: return per-county probabilities
+        risks = {h: [] for h in hazard_types}
+        for h in hazard_types:
+            logits = outputs[f'{h}_logits'].cpu().numpy().flatten()
+            for raw_logit in logits:
+                risks[h].append(_apply_calibration(float(raw_logit), h, month, temperatures))
+        return risks
+
+
 def _generate_fallback_risks(county_name: str) -> Dict[str, float]:
     """Generate plausible fallback risks based on county name hash.
     Used when model or data is unavailable."""
