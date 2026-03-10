@@ -145,14 +145,14 @@ MODEL_PATH_CLOUD = Path("/mount/src/ahi-capstone/best_model.pt")  # Streamlit Cl
 MODEL_PATH_TMP = Path("/tmp/best_model.pt")
 MODEL_URL = "https://media.githubusercontent.com/media/JDCurry/ahi-capstone/main/best_model.pt"
 MODEL_LOAD_ERROR = None
-MODEL_DISPLAY_NAME = "HazardLM-Diffusion v2.0"
+MODEL_DISPLAY_NAME = "HazardLM v1 (Legacy)"
 MIN_MODEL_SIZE = 5_000_000  # 5MB - diffusion model is ~10MB (880K params)
 
 # AHI v2 model paths
 V2_MODEL_PATH = Path("outputs/ahi_v2/best_model.pt")
 V2_MODEL_PATH_LOCAL = V2_MODEL_PATH
 V2_MODEL_PATH_CLOUD = Path("/mount/src/ahi-capstone/outputs/ahi_v2/best_model.pt")
-V2_MODEL_DISPLAY_NAME = "AHI v2 Stacked Mesh"
+V2_MODEL_DISPLAY_NAME = "AHI v2 — Stacked Mesh"
 
 # Available model choices
 MODEL_CHOICES = {"v1": MODEL_DISPLAY_NAME}
@@ -1182,28 +1182,12 @@ def render_sidebar():
         if st.button("About This Project", use_container_width=True):
             st.session_state.page = 'about'
         
-        # ---- Model Selector ----
-        if len(MODEL_CHOICES) > 1:
-            st.markdown(f"<p style='color: {COLORS['text_tertiary']}; font-size: 14px; font-weight: 600; text-transform: uppercase; margin-top: 20px; letter-spacing: 0.5px;'>Prediction Model</p>", unsafe_allow_html=True)
-            # Initialize default
-            if 'selected_model' not in st.session_state:
-                st.session_state.selected_model = 'v2' if 'v2' in MODEL_CHOICES else 'v1'
-            selected_model = st.radio(
-                "Select prediction model",
-                options=list(MODEL_CHOICES.keys()),
-                format_func=lambda k: MODEL_CHOICES[k],
-                index=list(MODEL_CHOICES.keys()).index(st.session_state.get('selected_model', 'v1')),
-                label_visibility="collapsed",
-            )
-            st.session_state.selected_model = selected_model
-            # Show model info
-            if selected_model == 'v2':
-                st.caption("🔬 Stacked Mesh (1.3M params) — AUC 0.819")
-            else:
-                st.caption("📡 Heat Kernel Diffusion (880K params) — AUC 0.641")
+        # ---- Model indicator (v2 only for public deploy) ----
+        st.session_state.selected_model = 'v2' if AHI_V2_AVAILABLE and 'v2' in MODEL_CHOICES else 'v1'
+        if st.session_state.selected_model == 'v2':
+            st.caption("🔬 AHI v2 — Stacked Mesh (1.3M params)")
         else:
-            if 'selected_model' not in st.session_state:
-                st.session_state.selected_model = 'v1'
+            st.caption("📡 HazardLM v1 (880K params)")
 
         st.markdown("---")
 
