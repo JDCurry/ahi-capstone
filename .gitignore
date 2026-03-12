@@ -35,3 +35,9 @@ Thumbs.db
 outputs/*/checkpoint_epoch_*.pt
 outputs/*/training_history.json
 outputs/*/gate_history.json
+
+# Training pipeline (private)
+train_ahi_v2.py
+
+# Training data (not needed for inference)
+data/hazard_lm_clean_labeled.parquet
