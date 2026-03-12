@@ -3675,21 +3675,31 @@ def page_about():
     ---
     
     ### Research Papers
-    
-    This work is supported by two preprints on SSRN:
-    
-    - [Diffusion Attention: Replacing Softmax with Heat Kernel Dynamics](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5953096)
-    - [Heat Kernel Attention: Provable Sparsity via Diffusion Dynamics](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5959898)
+
+    This work is supported by published research on SSRN:
+
+    - [Diffusion Attention: Replacing Softmax with Heat Kernel Dynamics](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5953096) — Theoretical foundation for heat kernel attention
+    - [Heat Kernel Attention: Provable Sparsity via Diffusion Dynamics](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5959898) — Locality proofs and composition law
+    - [Meta-Meta Attention: Generalizing ALiBi with Learned Content-Aware Bias Fields](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=6316718) — Feature-type routing for heterogeneous inputs
+    - [Simplicial Computation: Topology as Control in Heterogeneous Attention](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=6037977) — Timescale incompatibility theory motivating the stacked mesh
     """)
     
     st.markdown("---")
     
     st.markdown("""
-    ### Model Overview
+    ### Model Architecture
 
-    **HazardLM-Diffusion v2.0** is a transformer model using heat kernel (diffusion) attention,
-    trained on 370,000+ county-day observations across all 39 Washington counties (2000-2025).
-    It is combined with calibrated XGBoost per-hazard classifiers in an ensemble for robust predictions.
+    **AHI v2 — Stacked Mesh** (1,294,547 parameters) uses a dual-mesh transformer architecture
+    that separates temporal and spatial processing into dedicated attention stages:
+
+    - **Temporal Mesh** (3 layers): Heat kernel diffusion attention processes 14-day weather sequences,
+      learning per-hazard memory horizons (e.g., drought buildup for fire, precipitation accumulation for flood)
+    - **Spatial Mesh** (2 layers): Standard softmax attention with k-nearest-neighbor county adjacency masking
+      captures cross-county correlations (smoke drift, atmospheric rivers, downstream flooding)
+    - **Gated Coupling**: Learned gate (g ~ 0.08) controls spatial contribution to final predictions
+
+    Trained on 370,000+ county-day observations across all 39 Washington counties (2000-2025).
+    Mean AUC 0.819 — surpasses XGBoost baseline (0.781) on aggregate and on 3 of 5 hazard types.
 
     **Training data sources:**
     - NOAA Storm Events Database (26 files — flood, wind, winter labels)
@@ -3703,10 +3713,12 @@ def page_about():
 
     ### Key Features
 
-    - **Heat Kernel Attention:** Replaces softmax with diffusion dynamics for smoother, better-calibrated outputs
-    - **Calibrated Outputs:** Isotonic calibration (XGBoost) ensures predicted probabilities match real-world frequencies
+    - **Stacked Mesh Architecture:** Separates temporal weather dynamics from spatial county correlations, resolving timescale incompatibility that limited v1
+    - **Heat Kernel Attention:** Temporal mesh uses diffusion dynamics for provable locality and improved calibration
+    - **Spatial Awareness:** Cross-county attention captures weather system propagation, smoke drift, and downstream flooding
+    - **Date-Grouped Batching:** All 39 counties per batch ensures coherent spatial attention signal
+    - **Calibrated Outputs:** Multi-stage pipeline (temperature scaling + seasonal priors + base-rate ceilings)
     - **County-Level Resolution:** Predictions available for all 39 Washington counties
-    - **Multi-Hazard Ensemble:** Combines deep learning (diffusion transformer) with gradient-boosted trees
     - **Seasonal Awareness:** Physics-informed penalties suppress implausible off-season predictions
     - **Clean Labels:** Rebuilt pipeline with strict county matching and 3-day event windows
     
