@@ -3496,15 +3496,6 @@ def page_model_diagnostics():
 
     st.markdown("**Planned / Future Work**")
     st.markdown("""
-    - Expand to Pacific Northwest states (Oregon, Idaho) with hierarchical calibration
-    - Integrate real-time weather feeds (NWS/NOAA) for operational nowcasts
-    - Add Monte Carlo Dropout uncertainty quantification for prediction intervals
-    - Hybrid extraction (v2 representations + XGBoost) for potential further gains
-    - Apply for CIVIC/SBIR grants to scale nationwide
-    """)
-
-    st.markdown("**Planned / Future Work**")
-    st.markdown("""
     - Expand to Pacific Northwest states (Oregon, Idaho) with hierarchical calibration for low-event counties
     - Integrate real-time weather feeds (NWS/NOAA) for operational nowcasts
     - Add Monte Carlo Dropout uncertainty quantification for prediction intervals
