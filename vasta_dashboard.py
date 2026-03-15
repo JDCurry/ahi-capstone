@@ -1184,10 +1184,6 @@ def render_sidebar():
         
         # ---- Model indicator (v2 only for public deploy) ----
         st.session_state.selected_model = 'v2' if AHI_V2_AVAILABLE and 'v2' in MODEL_CHOICES else 'v1'
-        if st.session_state.selected_model == 'v2':
-            st.caption("🔬 AHI v2 — Stacked Mesh (1.3M params)")
-        else:
-            st.caption("📡 HazardLM v1 (880K params)")
 
         st.markdown("---")
 
