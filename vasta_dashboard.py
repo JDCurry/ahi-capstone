@@ -1399,12 +1399,6 @@ def page_executive_dashboard():
     if model_ok:
             _n = sum(p.numel() for p in model.parameters()) if model is not None else 0
             _ps = f"{_n/1_000_000:.1f}M" if _n >= 1_000_000 else f"{_n/1_000:.0f}K"
-            st.markdown(f"""
-            <div class="alert-box alert-success">
-                <strong>AI MODEL ACTIVE</strong><br>
-                {MODEL_DISPLAY_NAME} is online and ready for predictions. {_ps} parameters, heat kernel attention, 5 hazard types.
-            </div>
-            """, unsafe_allow_html=True)
 
 
 # =============================================================================
