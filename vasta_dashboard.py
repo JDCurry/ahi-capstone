@@ -1257,6 +1257,12 @@ def render_sidebar():
                 # Clear cache button
                 if st.button("Clear Model Cache"):
                     st.cache_resource.clear()
+                    # Also reset module-level temperature cache in inference_core
+                    try:
+                        import inference_core
+                        inference_core._TEMPERATURES = {}
+                    except Exception:
+                        pass
                     st.rerun()
         except Exception:
             # if session_state unavailable, ignore
