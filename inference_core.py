@@ -108,16 +108,15 @@ SEASONAL_LOGIT_BIAS = {
 # Training data base rates (3-day label window):
 #   fire ~1.1%, flood ~0.9%, wind ~2.8%, winter ~4.3%, seismic ~3.0%
 #
-# Ceilings are set relative to model reliability:
-# - Well-calibrated heads (fire AUC 0.73, winter AUC 0.74) get generous ceilings
-# - Weak heads (wind AUC 0.58, seismic AUC 0.50) get tighter ceilings since the
-#   model can't discriminate well and overconfident predictions are meaningless
+# Updated for AHI v2 (stacked mesh) per-hazard AUCs:
+#   fire 0.88, flood 0.90, wind 0.83, winter 0.91, seismic 0.68
+# All heads are now strong discriminators; ceilings are generous.
 BASE_RATE_CEILING = {
-    'fire':    0.35,  # 35% max - well-calibrated head, generous ceiling
-    'flood':   0.25,  # 25% max - moderate head (AUC 0.65)
-    'wind':    0.15,  # 15% max - weak head (AUC 0.58), can't trust high values
-    'winter':  0.35,  # 35% max - best head (AUC 0.74), generous ceiling
-    'seismic': 0.08,  # 8% max  - near-random head (AUC 0.50), tight ceiling
+    'fire':    0.35,  # 35% max - strong head (AUC 0.88)
+    'flood':   0.35,  # 35% max - strong head (AUC 0.90)
+    'wind':    0.25,  # 25% max - good head (AUC 0.83)
+    'winter':  0.35,  # 35% max - best head (AUC 0.91)
+    'seismic': 0.15,  # 15% max - weakest head (AUC 0.68), moderate ceiling
 }
 
 # --- Month-aware ceilings for seasonal hazards ---
@@ -224,19 +223,18 @@ def _apply_calibration(
     T = temperatures.get(hazard, 1.0)
     T = max(T, 0.01)  # Guard against division by zero
     # For poorly-performing heads, don't let T<1 amplify bad predictions
-    WEAK_HEADS = {'wind', 'seismic'}  # AUC < 0.65 on test set
+    # v2 update: only seismic remains weak (AUC 0.68). Wind is now strong (0.83).
+    WEAK_HEADS = {'seismic'}  # AUC < 0.70 on test set
     if hazard in WEAK_HEADS:
         T = max(T, 1.0)  # Only soften, never sharpen
     scaled_logit = raw_logit / T
 
     # Step 1b: Base-rate recalibration bias for weak heads
-    # The wind and seismic heads are near-random (AUC ~0.50-0.58) and
-    # systematically overconfident (mean raw prob ~40% vs base rate ~3%).
-    # Apply a constant negative logit bias to pull predictions toward
-    # realistic base rates. This preserves whatever ranking signal exists.
+    # v2 update: wind is no longer weak (AUC 0.83), bias removed.
+    # Seismic (AUC 0.68) still overconfident — softened bias from -2.5 to -1.5
+    # since the head now has real discriminative power.
     WEAK_HEAD_BIAS = {
-        'wind':    -1.5,  # Pull ~38% raw -> ~12% (still allows discrimination)
-        'seismic': -2.5,  # Pull ~40% raw -> ~4%  (near-random, anchor to base rate)
+        'seismic': -1.5,  # Pull overconfident seismic toward realistic range
     }
     if hazard in WEAK_HEAD_BIAS:
         scaled_logit += WEAK_HEAD_BIAS[hazard]
