@@ -150,6 +150,9 @@ def _get_ceiling(hazard: str, month: int) -> float:
 def load_temperature_scales(path: Optional[str] = None) -> Dict[str, float]:
     """Load per-hazard temperature scales from JSON file.
 
+    Always reads from disk (no in-memory caching) to ensure
+    updates to temperature_scales.json take effect immediately.
+
     Temperature scaling: calibrated_logit = raw_logit / T
     T < 1 sharpens (more confident), T > 1 softens (less confident).
     Fitted by minimizing NLL on the validation set.
@@ -160,15 +163,10 @@ def load_temperature_scales(path: Optional[str] = None) -> Dict[str, float]:
     Returns:
         Dict mapping hazard type -> temperature (float > 0)
     """
-    global _TEMPERATURES
-
-    # Already loaded
-    if _TEMPERATURES:
-        return _TEMPERATURES
-
     search_paths = [
         Path(path) if path else None,
         Path('temperature_scales.json'),
+        Path('outputs/ahi_v2/temperature_scales_v2.json'),
         Path('outputs/diffusion_clean_v1/temperature_scales.json'),
         Path('data/temperature_scales.json'),
     ]
@@ -179,15 +177,14 @@ def load_temperature_scales(path: Optional[str] = None) -> Dict[str, float]:
                 with open(p) as f:
                     data = json.load(f)
                 temps = data.get('temperatures', data)
-                _TEMPERATURES = {h: float(temps[h]) for h in HAZARD_TYPES if h in temps}
-                print(f"[CALIBRATION] Loaded temperature scales from {p}: {_TEMPERATURES}")
-                return _TEMPERATURES
+                loaded = {h: float(temps[h]) for h in HAZARD_TYPES if h in temps}
+                print(f"[CALIBRATION] Loaded temperature scales from {p}: {loaded}")
+                return loaded
             except Exception as e:
                 print(f"[CALIBRATION] Error loading {p}: {e}")
 
     print("[CALIBRATION] No temperature_scales.json found - using T=1.0 (uncalibrated)")
-    _TEMPERATURES = {h: 1.0 for h in HAZARD_TYPES}
-    return _TEMPERATURES
+    return {h: 1.0 for h in HAZARD_TYPES}
 
 
 def _apply_calibration(
