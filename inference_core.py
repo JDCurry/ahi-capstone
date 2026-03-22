@@ -116,7 +116,7 @@ BASE_RATE_CEILING = {
     'flood':   0.35,  # 35% max - strong head (AUC 0.90)
     'wind':    0.25,  # 25% max - good head (AUC 0.83)
     'winter':  0.35,  # 35% max - best head (AUC 0.91)
-    'seismic': 0.10,  # 10% max - weakest head (AUC 0.68), base rate ~3%
+    'seismic': 0.05,  # 5% max - constant geographic risk, not weather-driven
 }
 
 # --- Month-aware ceilings for seasonal hazards ---
@@ -231,7 +231,7 @@ def _apply_calibration(
     # Seismic (AUC 0.68) still overconfident — softened bias from -2.5 to -1.5
     # since the head now has real discriminative power.
     WEAK_HEAD_BIAS = {
-        'seismic': -1.5,  # Pull overconfident seismic toward realistic range
+        'seismic': -2.0,  # Seismic is constant geographic risk, not daily-varying
     }
     if hazard in WEAK_HEAD_BIAS:
         scaled_logit += WEAK_HEAD_BIAS[hazard]
