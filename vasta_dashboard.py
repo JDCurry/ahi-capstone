@@ -2503,7 +2503,12 @@ def page_ai_predictions():
             if last.get('county') == selected_county and last.get('date') == str(sel_date):
                 mid1, mid2, mid3 = st.columns([1,2,1])
                 with mid2:
-                    hazard_order = ['fire','flood','wind','winter','seismic']
+                    # Sort hazards by severity (highest risk first)
+                    hazard_order = sorted(
+                        ['fire','flood','wind','winter','seismic'],
+                        key=lambda h: last['risks'].get(h, 0.0),
+                        reverse=True
+                    )
                     cols_out = st.columns(5)
                     for c, h in zip(cols_out, hazard_order):
                         p = last['risks'].get(h, 0.0)
