@@ -116,7 +116,7 @@ BASE_RATE_CEILING = {
     'flood':   0.35,  # 35% max - strong head (AUC 0.90)
     'wind':    0.25,  # 25% max - good head (AUC 0.83)
     'winter':  0.35,  # 35% max - best head (AUC 0.91)
-    'seismic': 0.15,  # 15% max - weakest head (AUC 0.68), moderate ceiling
+    'seismic': 0.10,  # 10% max - weakest head (AUC 0.68), base rate ~3%
 }
 
 # --- Month-aware ceilings for seasonal hazards ---
