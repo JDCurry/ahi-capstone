@@ -3661,7 +3661,6 @@ def page_about():
 
     - [Diffusion Attention: Replacing Softmax with Heat Kernel Dynamics](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5953096) — Theoretical foundation for heat kernel attention
     - [Heat Kernel Attention: Provable Sparsity via Diffusion Dynamics](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=5959898) — Locality proofs and composition law
-    - [Meta-Meta Attention: Generalizing ALiBi with Learned Content-Aware Bias Fields](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=6316718) — Feature-type routing for heterogeneous inputs
     - [Simplicial Computation: Topology as Control in Heterogeneous Attention](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=6037977) — Timescale incompatibility theory motivating the stacked mesh
     """)
     
