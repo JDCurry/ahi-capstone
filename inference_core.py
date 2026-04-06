@@ -1,13 +1,27 @@
 """
-Cloud-safe inference core for HazardLM-Diffusion v2.0.
+Cloud-safe inference core for AHI v2.5 (Experiment D — Learned Seasonal Bias).
 NO training dependencies - pure PyTorch inference only.
+
+v2.5 improvements over v2.0:
+  - Model trained with LearnedSeasonalBias (nn.Parameter(5,12)) instead of
+    hardcoded seasonal_penalty(). The model independently discovered seasonal
+    structure matching domain priors, with finer granularity.
+  - Mean test AUC: 0.829 (up from 0.819 in v2.0)
+  - Temperature scales re-fitted on v2.5 validation set.
+  - Flood T overridden to 0.90 (NLL-optimal 0.321 crushes predictions — see below).
+
+  NOTE on flood temperature: NLL minimization fitted T=0.321 for flood, but this
+  is dominated by the 99.1% non-flood majority class. Sharpening negative logits
+  by 3x pushes sigmoid output to <1%, destroying operational prediction spread.
+  T=0.90 provides mild sharpening while preserving the 5-30% range that gives
+  meaningful county differentiation. The flood AUC (0.83) is strong regardless.
 
 Calibration pipeline (applied in order):
   1. Temperature scaling  - per-hazard T fitted on validation set (NLL optimization)
   2. Seasonal prior       - physics-informed logit bias by month (WA climatology)
   3. Base-rate ceiling     - caps max probability at historical plausibility limits
 
-Updated for HazardLMDiffusion model API:
+Model API:
   model(static_cont, temporal, region_ids, state_ids, nlcd_ids)
   -> dict with {hazard}_prob and {hazard}_logits keys
 """
@@ -108,9 +122,9 @@ SEASONAL_LOGIT_BIAS = {
 # Training data base rates (3-day label window):
 #   fire ~1.1%, flood ~0.9%, wind ~2.8%, winter ~4.3%, seismic ~3.0%
 #
-# Updated for AHI v2 (stacked mesh) per-hazard AUCs:
-#   fire 0.88, flood 0.90, wind 0.83, winter 0.91, seismic 0.68
-# All heads are now strong discriminators; ceilings are generous.
+# Updated for AHI v2.5 (Experiment D — learned seasonal bias) per-hazard AUCs:
+#   fire 0.85, flood 0.83, wind 0.84, winter 0.91, seismic 0.72 (test)
+# All heads are strong discriminators; ceilings are generous.
 BASE_RATE_CEILING = {
     'fire':    0.35,  # 35% max - strong head (AUC 0.88)
     'flood':   0.35,  # 35% max - strong head (AUC 0.90)
@@ -220,18 +234,18 @@ def _apply_calibration(
     T = temperatures.get(hazard, 1.0)
     T = max(T, 0.01)  # Guard against division by zero
     # For poorly-performing heads, don't let T<1 amplify bad predictions
-    # v2 update: only seismic remains weak (AUC 0.68). Wind is now strong (0.83).
-    WEAK_HEADS = {'seismic'}  # AUC < 0.70 on test set
+    # v2.5 update (Experiment D): all heads strong except seismic (AUC 0.69)
+    # Fire 0.85, Flood 0.83, Wind 0.84, Winter 0.91, Seismic 0.72 (test)
+    WEAK_HEADS = {'seismic'}  # AUC < 0.75 on test set
     if hazard in WEAK_HEADS:
         T = max(T, 1.0)  # Only soften, never sharpen
     scaled_logit = raw_logit / T
 
     # Step 1b: Base-rate recalibration bias for weak heads
-    # v2 update: wind is no longer weak (AUC 0.83), bias removed.
-    # Seismic (AUC 0.68) still overconfident — softened bias from -2.5 to -1.5
-    # since the head now has real discriminative power.
+    # v2.5 update: seismic (AUC 0.72 test) still geographic background risk.
+    # Bias reduced from -2.0 to -1.5 since D's model has slightly better seismic.
     WEAK_HEAD_BIAS = {
-        'seismic': -2.0,  # Seismic is constant geographic risk, not daily-varying
+        'seismic': -1.5,  # Seismic is constant geographic risk, not daily-varying
     }
     if hazard in WEAK_HEAD_BIAS:
         scaled_logit += WEAK_HEAD_BIAS[hazard]
